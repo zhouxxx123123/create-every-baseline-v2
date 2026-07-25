@@ -1,0 +1,4 @@
+interface:
+  display_name: "Product Readiness"
+  short_description: "Prepare product context for specification"
+  default_prompt: "Use $product-readiness to assess this bounded product area and route its remaining readiness work."

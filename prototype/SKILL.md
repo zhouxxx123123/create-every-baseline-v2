@@ -49,6 +49,8 @@ The canonical identity used outside the manifest is the full prototype reference
 
 When migrating historical letter-coded versions, preserve the original code under `Legacy aliases`, assign a semantic display name, and keep the original full prototype reference, artifact, fixture, review, and selection history unchanged. Renaming display metadata never authorizes renumbering or rewriting reviewed evidence.
 
+The validator treats the old `Display label` column as a migration warning, while the current `Display name` schema enforces semantic naming and the `Legacy aliases` column. New manifests must use the current schema.
+
 ## Create a prototype manifest
 
 Keep a manifest beside the prototype in the repository-declared format. If none exists, use `PROTOTYPE.md`; an existing `NOTES.md` may be upgraded in place. The manifest is the traceability record, while the prototype code remains throwaway.

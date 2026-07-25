@@ -1,7 +1,6 @@
 ---
 name: to-tickets
 description: Translate an approved conversation, plan, or specification into validated tracer-bullet tickets with explicit dependencies, requirement and evidence ownership, tracker publication, readback, and frontier handling.
-disable-model-invocation: true
 ---
 
 # To Tickets

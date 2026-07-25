@@ -95,7 +95,7 @@ function findSkillFiles(root) {
 
 function findExplicitInvocations(text) {
   const names = new Set();
-  for (const match of text.matchAll(/`(?:\$|\/)([a-z][a-z0-9-]{1,63})`/g)) {
+  for (const match of text.matchAll(/`\$([a-z][a-z0-9-]{1,63})`/g)) {
     names.add(match[1]);
   }
   for (const match of text.matchAll(/\$([a-z][a-z0-9-]{1,63})\b/g)) {
@@ -171,6 +171,8 @@ function main() {
         if (!/^\s*short_description:\s*["']?.+?["']?\s*$/m.test(uiText)) {
           warnings.push(`UI metadata lacks short_description: ${uiMetadata}`);
         }
+      } else {
+        warnings.push(`Skill lacks UI metadata: ${skillDir}`);
       }
 
       skills.push({ name, skillFile, skillDir });
@@ -201,7 +203,7 @@ function main() {
           !invocation.startsWith("Users") &&
           !invocation.startsWith("tmp")
         ) {
-          warnings.push(`Unknown explicit invocation '/${invocation}' in ${filePath}`);
+          warnings.push(`Unknown explicit invocation '$${invocation}' in ${filePath}`);
         }
       }
     }

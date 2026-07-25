@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Reach"
+  short_description: "Search supported internet platforms"
+  default_prompt: "Use $agent-reach to investigate this topic across supported internet platforms."

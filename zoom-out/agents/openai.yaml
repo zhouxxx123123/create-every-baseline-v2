@@ -1,0 +1,6 @@
+interface:
+  display_name: "Zoom Out"
+  short_description: "Explain the broader context and relationships"
+  default_prompt: "Use $zoom-out to explain how this work fits into the broader system."
+policy:
+  allow_implicit_invocation: false

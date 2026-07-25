@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prototype Parity Check"
+  short_description: "Compare implementation with approved prototype"
+  default_prompt: "Use $prototype-parity-check to compare this implementation with its approved prototype evidence."

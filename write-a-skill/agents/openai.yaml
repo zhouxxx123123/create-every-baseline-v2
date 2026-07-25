@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write A Skill"
+  short_description: "Create a structured reusable agent skill"
+  default_prompt: "Use $write-a-skill to create a reusable skill for this workflow."

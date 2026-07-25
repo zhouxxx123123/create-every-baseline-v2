@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pre-PRD Hardening"
+  short_description: "Harden product context before readiness"
+  default_prompt: "Use $pre-prd-hardening to identify unresolved product context before the readiness gate."

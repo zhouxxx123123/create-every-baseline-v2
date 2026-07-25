@@ -262,9 +262,13 @@ function main() {
     );
   }
   if (!versionsTable.headers.includes("Legacy aliases")) {
-    warnings.push(
-      "Prototype versions has no 'Legacy aliases' column; add it when migrating historical codes.",
-    );
+    const message =
+      "Prototype versions has no 'Legacy aliases' column; add it when migrating historical codes.";
+    if (displayNameColumn === "Display name") {
+      errors.push(message);
+    } else {
+      warnings.push(message);
+    }
   }
 
   const seenVersionIds = new Set();
@@ -291,9 +295,14 @@ function main() {
     if (isPlaceholder(displayName)) {
       errors.push(`Version ${versionId} requires a semantic display name.`);
     } else if (isOpaqueDisplayName(displayName)) {
-      errors.push(
-        `Version ${versionId} uses opaque display name '${displayName}'; use a semantic name and move historical codes to 'Legacy aliases'.`,
-      );
+      const message =
+        `Version ${versionId} uses opaque display name '${displayName}'; ` +
+        "use a semantic name and move historical codes to 'Legacy aliases'.";
+      if (displayNameColumn === "Display label") {
+        warnings.push(`Legacy manifest: ${message}`);
+      } else {
+        errors.push(message);
+      }
     }
   }
 

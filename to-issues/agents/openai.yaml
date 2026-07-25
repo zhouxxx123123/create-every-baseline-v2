@@ -1,0 +1,4 @@
+interface:
+  display_name: "To Issues"
+  short_description: "Split an approved specification into issues"
+  default_prompt: "Use $to-issues to split this approved specification into traceable implementation issues."

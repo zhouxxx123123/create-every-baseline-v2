@@ -1,0 +1,4 @@
+interface:
+  display_name: "PRD Implementation Precheck"
+  short_description: "Review a specification before implementation"
+  default_prompt: "Use $prd-implementation-precheck to review this specification before implementing it."

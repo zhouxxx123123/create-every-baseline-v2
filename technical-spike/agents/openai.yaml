@@ -1,0 +1,4 @@
+interface:
+  display_name: "Technical Spike"
+  short_description: "Validate one material technical uncertainty"
+  default_prompt: "Use $technical-spike to validate this bounded technical uncertainty with evidence."

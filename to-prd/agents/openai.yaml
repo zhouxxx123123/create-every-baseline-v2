@@ -1,0 +1,4 @@
+interface:
+  display_name: "To PRD"
+  short_description: "Create a specification from product context"
+  default_prompt: "Use $to-prd to turn this confirmed product context into a specification."

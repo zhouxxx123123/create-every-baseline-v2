@@ -10,21 +10,6 @@ description: >
 
   Use when user asks to search, read, or interact on any supported platform,
   shares a URL, or asks to search the web.
-triggers:
-  - search: 搜/查/找/search/搜索/查一下/帮我搜
-  - social:
-    - 小红书: xiaohongshu/xhs/小红书/红书
-    - 抖音: douyin/抖音
-    - Twitter: twitter/推特/x.com/推文
-    - 微博: weibo/微博
-    - B站: bilibili/b站/哔哩哔哩
-    - V2EX: v2ex
-    - Reddit: reddit
-  - career: 招聘/职位/求职/linkedin/领英/找工作
-  - dev: github/代码/仓库/gh/issue/pr/分支/commit
-  - web: 网页/链接/文章/公众号/微信文章/rss/读一下/打开这个
-  - video: youtube/视频/播客/字幕/小宇宙/转录/yt
-  - finance: 雪球/股票/stock/xueqiu/行情/基金
 metadata:
   openclaw:
     homepage: https://github.com/Panniantong/Agent-Reach
