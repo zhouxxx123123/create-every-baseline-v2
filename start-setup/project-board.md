@@ -2,6 +2,7 @@
 
 - Mode: `NONE | LOCAL_HTML | GITHUB_PROJECT | DUAL`
 - Canonical state: `ISSUE_TRACKER`
+- Interface language: `zh-CN | en`
 - GitHub Project: `<URL or Not configured>`
 - Local HTML: `<repo-relative output path or Not configured>`
 - Local URL: `http://127.0.0.1:<port>/`

@@ -433,135 +433,558 @@ function htmlDocument(items) {
     .replaceAll(">", "\\u003e")
     .replaceAll("&", "\\u0026");
   const title = String(config.title || "Project Board");
+  const locale = config.locale === "zh-CN" ? "zh-CN" : "en";
+  const copy = boardCopy(locale);
+  const safeCopy = JSON.stringify(copy)
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("&", "\\u0026");
   const generatedAt = new Date().toISOString();
 
   return `<!doctype html>
-<html lang="en">
+<html lang="${locale}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
   <style>
-    :root { --paper:#f4f0e6; --ink:#12263a; --muted:#66717d; --line:#d7d0c2; --accent:#d55d3d; --card:#fffdf8; --frontier:#087e6a; --edge:#93a0aa; }
+    :root {
+      --canvas:#f5f5f7;
+      --surface:#ffffff;
+      --sidebar:#f1f1f3;
+      --inspector:#fafafa;
+      --ink:#1d1d1f;
+      --secondary:#6e6e73;
+      --tertiary:#8e8e93;
+      --hairline:rgba(60,60,67,.16);
+      --hairline-strong:rgba(60,60,67,.24);
+      --selection:#e8f2ff;
+      --selection-strong:#0a84ff;
+      --frontier:#30a46c;
+      --blocked:#d70015;
+      --done:#34c759;
+      --warning:#ff9f0a;
+      --edge:#8e8e93;
+      --source-width:224px;
+      --inspector-width:288px;
+      color-scheme:light;
+    }
     * { box-sizing:border-box; }
-    body { margin:0; color:var(--ink); background:radial-gradient(circle at 15% 0%, #fff8e8 0, transparent 35%), var(--paper); font-family:"Avenir Next","DIN Alternate",sans-serif; }
-    header { position:sticky; top:0; z-index:2; padding:24px 28px 18px; border-bottom:1px solid var(--line); background:rgba(244,240,230,.94); backdrop-filter:blur(12px); }
-    h1 { margin:0 0 4px; font-size:clamp(24px,3vw,40px); letter-spacing:-.04em; }
-    .meta { color:var(--muted); font-size:13px; }
-    .toolbar { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:16px; flex-wrap:wrap; }
-    .controls, .tabs { display:flex; gap:8px; flex-wrap:wrap; }
-    input, select, button { border:1px solid var(--line); border-radius:999px; background:var(--card); color:var(--ink); padding:10px 14px; font:inherit; }
-    input { min-width:min(420px, 80vw); }
-    button { cursor:pointer; font-weight:650; }
-    button[aria-selected="true"] { color:#fff; border-color:var(--ink); background:var(--ink); }
-    main { padding:22px 28px 40px; }
+    html, body { min-height:100%; }
+    body {
+      margin:0;
+      color:var(--ink);
+      background:var(--canvas);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",sans-serif;
+      font-size:13px;
+      -webkit-font-smoothing:antialiased;
+    }
+    button, input, select { font:inherit; }
+    button { color:inherit; cursor:pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline:3px solid rgba(10,132,255,.28);
+      outline-offset:1px;
+    }
+    .window { min-height:100vh; display:grid; grid-template-rows:52px minmax(0,1fr); background:var(--surface); }
+    .titlebar {
+      position:relative;
+      z-index:10;
+      display:grid;
+      grid-template-columns:170px minmax(0,1fr) 240px;
+      align-items:center;
+      min-height:52px;
+      border-bottom:1px solid var(--hairline);
+      background:rgba(250,250,250,.82);
+      padding:0 16px;
+      backdrop-filter:saturate(180%) blur(22px);
+    }
+    .traffic-lights { display:flex; gap:8px; align-items:center; }
+    .traffic-lights i { width:12px; height:12px; border-radius:50%; border:1px solid rgba(0,0,0,.08); }
+    .traffic-lights i:nth-child(1) { background:#ff5f57; }
+    .traffic-lights i:nth-child(2) { background:#febc2e; }
+    .traffic-lights i:nth-child(3) { background:#28c840; }
+    .window-title { overflow:hidden; text-align:center; text-overflow:ellipsis; white-space:nowrap; font-weight:600; letter-spacing:-.01em; }
+    .sync-state { color:var(--secondary); font-size:11px; text-align:right; white-space:nowrap; }
+    .app-body { min-height:0; display:grid; grid-template-columns:var(--source-width) minmax(460px,1fr) var(--inspector-width); }
+    .source-list {
+      min-width:0;
+      overflow:auto;
+      border-right:1px solid var(--hairline);
+      background:var(--sidebar);
+      padding:14px 10px 12px;
+    }
+    .source-title { padding:5px 9px 12px; }
+    .source-title strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; letter-spacing:-.015em; }
+    .source-title span { display:block; margin-top:3px; color:var(--secondary); font-size:11px; }
+    .nav-section { margin-top:15px; }
+    .nav-label { padding:0 9px 5px; color:var(--tertiary); font-size:11px; font-weight:600; }
+    .tabs, .effort-list { display:grid; gap:2px; }
+    .tabs button, .effort-list button {
+      width:100%;
+      min-height:29px;
+      display:grid;
+      grid-template-columns:18px minmax(0,1fr) auto;
+      align-items:center;
+      gap:6px;
+      border:0;
+      border-radius:6px;
+      background:transparent;
+      padding:4px 8px;
+      text-align:left;
+    }
+    .tabs button:hover, .effort-list button:hover { background:rgba(0,0,0,.045); }
+    .tabs button[aria-selected="true"], .effort-list button.active { background:rgba(0,0,0,.075); font-weight:600; }
+    .nav-icon { display:grid; place-items:center; width:16px; height:16px; color:var(--selection-strong); font-size:14px; }
+    .nav-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .nav-count { color:var(--secondary); font-size:11px; font-variant-numeric:tabular-nums; }
+    .status-list { display:grid; gap:2px; }
+    .status-row { min-height:27px; display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:6px; padding:3px 8px; }
+    .status-dot { width:7px; height:7px; justify-self:center; border-radius:50%; background:var(--tertiary); }
+    .status-dot.frontier { background:var(--frontier); }
+    .status-dot.blocked { background:var(--blocked); }
+    .status-dot.done { background:var(--done); }
+    .status-row span:last-child { color:var(--secondary); font-size:11px; font-variant-numeric:tabular-nums; }
+    .sidebar-foot { margin-top:18px; border-top:1px solid var(--hairline); padding:11px 9px 0; color:var(--tertiary); font-size:10px; line-height:1.5; }
+    .workspace { min-width:0; min-height:0; display:grid; grid-template-rows:64px minmax(0,1fr); background:var(--surface); }
+    .toolbar {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      border-bottom:1px solid var(--hairline);
+      padding:10px 16px 10px 18px;
+      background:rgba(255,255,255,.86);
+      backdrop-filter:saturate(180%) blur(20px);
+    }
+    .page-heading { min-width:0; }
+    .page-heading h1 { margin:0; font-size:17px; font-weight:650; letter-spacing:-.02em; }
+    .page-heading p { margin:3px 0 0; color:var(--secondary); font-size:11px; white-space:nowrap; }
+    .controls { display:flex; align-items:center; gap:7px; }
+    .search-wrap { position:relative; }
+    .search-wrap::before { content:"⌕"; position:absolute; left:9px; top:50%; color:var(--tertiary); font-size:15px; transform:translateY(-53%); pointer-events:none; }
+    input, select {
+      height:30px;
+      border:1px solid var(--hairline-strong);
+      border-radius:7px;
+      background:#fff;
+      color:var(--ink);
+    }
+    input { width:min(290px,29vw); padding:0 10px 0 28px; }
+    select { padding:0 26px 0 9px; }
+    .content { min-width:0; min-height:0; overflow:auto; background:#fff; }
     .view[hidden] { display:none; }
-    .tree-root { max-width:980px; margin:0 auto; }
-    .root-card { display:flex; justify-content:space-between; align-items:center; gap:16px; border:1px solid var(--ink); border-radius:16px; background:var(--ink); color:#fff; padding:18px 20px; box-shadow:0 12px 30px rgba(18,38,58,.12); }
-    .root-card strong { font-size:18px; }
-    .groups { display:grid; gap:14px; margin-top:16px; }
-    details.group { border:1px solid var(--line); border-radius:16px; background:rgba(255,253,248,.72); overflow:hidden; }
-    details.group > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; padding:14px 16px; font-weight:700; list-style:none; }
-    details.group > summary::-webkit-details-marker { display:none; }
-    details.group > summary::before { content:"▾"; color:var(--accent); margin-right:8px; }
-    details.group:not([open]) > summary::before { content:"▸"; }
-    .group-title { display:flex; align-items:center; }
-    .tree-list { display:grid; gap:10px; border-top:1px solid var(--line); padding:14px; }
-    .tree-branch { position:relative; display:grid; gap:10px; }
-    .tree-children { display:grid; gap:10px; margin-left:24px; padding-left:18px; border-left:1px solid var(--line); }
-    .tree-children > .tree-branch::before { content:""; position:absolute; top:22px; left:-18px; width:14px; border-top:1px solid var(--line); }
-    .ticket-card { border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:12px; background:var(--card); padding:12px 14px; box-shadow:0 6px 20px rgba(18,38,58,.04); }
-    .ticket-card.frontier { border-color:var(--frontier); box-shadow:0 0 0 2px rgba(8,126,106,.12); }
-    .ticket-card a { color:inherit; text-decoration:none; font-weight:650; line-height:1.35; }
-    .ticket-card a:hover { color:var(--accent); }
-    .eyebrow { display:flex; justify-content:space-between; gap:8px; margin-bottom:7px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
-    .status { display:inline-flex; align-items:center; gap:5px; }
-    .status::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--accent); }
-    .frontier .status::before { background:var(--frontier); }
-    .tags { display:flex; gap:5px; flex-wrap:wrap; margin-top:9px; }
-    .tag { border-radius:999px; background:#e8e2d6; padding:3px 7px; color:#495561; font-size:10px; }
-    .count { color:var(--muted); font-variant-numeric:tabular-nums; }
-    .flow-shell { overflow:auto; min-height:560px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(rgba(215,208,194,.28) 1px, transparent 1px), linear-gradient(90deg, rgba(215,208,194,.28) 1px, transparent 1px), var(--card); background-size:24px 24px; }
-    .flow-shell svg { display:block; min-width:100%; }
-    .flow-edge { fill:none; stroke:var(--edge); stroke-width:1.7; marker-end:url(#arrow); }
-    .flow-node rect { fill:var(--card); stroke:var(--line); stroke-width:1.5; rx:12; }
-    .flow-node.frontier rect { stroke:var(--frontier); stroke-width:3; }
-    .flow-node text { fill:var(--ink); pointer-events:none; }
-    .flow-node .node-id { fill:var(--muted); font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
-    .flow-node .node-title { font-size:13px; font-weight:700; }
-    .flow-node .node-status { fill:var(--muted); font-size:11px; }
-    .legend { display:flex; gap:14px; margin:0 0 12px; color:var(--muted); font-size:12px; flex-wrap:wrap; }
-    .legend span { display:inline-flex; align-items:center; gap:6px; }
-    .legend i { width:9px; height:9px; border-radius:50%; background:var(--accent); }
+    .outline-header, .outline-row {
+      display:grid;
+      grid-template-columns:minmax(260px,1fr) 112px 108px 88px;
+      align-items:center;
+    }
+    .outline-header {
+      position:sticky;
+      top:0;
+      z-index:3;
+      min-height:28px;
+      border-bottom:1px solid var(--hairline);
+      background:rgba(250,250,250,.9);
+      color:var(--secondary);
+      font-size:10px;
+      backdrop-filter:blur(16px);
+    }
+    .outline-header span { padding:0 10px; }
+    .outline-header span + span { border-left:1px solid var(--hairline); }
+    .group { border-bottom:1px solid var(--hairline); }
+    .group > summary {
+      min-height:31px;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      cursor:pointer;
+      list-style:none;
+      background:#fafafa;
+      padding:0 11px;
+      font-weight:600;
+    }
+    .group > summary::-webkit-details-marker { display:none; }
+    .group > summary::before { content:"⌄"; width:13px; color:var(--secondary); font-size:11px; }
+    .group:not([open]) > summary::before { content:"›"; }
+    .group-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .count { margin-left:auto; color:var(--tertiary); font-size:10px; font-variant-numeric:tabular-nums; }
+    .outline-row {
+      width:100%;
+      min-height:41px;
+      border:0;
+      border-top:1px solid rgba(60,60,67,.10);
+      background:#fff;
+      padding:0;
+      text-align:left;
+    }
+    .outline-row:hover { background:#f7f7f8; }
+    .outline-row.selected { background:var(--selection); }
+    .outline-row > span { min-width:0; padding:0 10px; }
+    .outline-row > span + span { border-left:1px solid rgba(60,60,67,.08); }
+    .item-name { display:flex; align-items:center; gap:8px; padding-left:calc(12px + var(--depth,0) * 20px) !important; }
+    .item-marker { flex:0 0 auto; width:8px; height:8px; border-radius:50%; background:#c7c7cc; }
+    .lane-Active .item-marker, .frontier .item-marker { background:var(--frontier); }
+    .lane-Blocked .item-marker { background:var(--blocked); }
+    .lane-Done .item-marker { background:var(--done); }
+    .item-copy { min-width:0; }
+    .item-copy strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:500; }
+    .item-copy small { display:block; margin-top:2px; color:var(--tertiary); font-size:10px; }
+    .cell-muted { overflow:hidden; color:var(--secondary); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+    .state-label { display:inline-flex; align-items:center; gap:5px; color:var(--secondary); font-size:11px; }
+    .state-label::before { content:""; width:6px; height:6px; border-radius:50%; background:#c7c7cc; }
+    .lane-Active .state-label::before, .frontier .state-label::before { background:var(--frontier); }
+    .lane-Blocked .state-label::before { background:var(--blocked); }
+    .lane-Done .state-label::before { background:var(--done); }
+    .empty { display:grid; place-items:center; min-height:240px; color:var(--secondary); }
+    .flow-head {
+      min-height:45px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      border-bottom:1px solid var(--hairline);
+      padding:0 15px;
+      color:var(--secondary);
+      font-size:11px;
+    }
+    .legend { display:flex; gap:14px; flex-wrap:wrap; }
+    .legend span { display:inline-flex; align-items:center; gap:5px; }
+    .legend i { width:7px; height:7px; border-radius:50%; background:#c7c7cc; }
     .legend .frontier-key i { background:var(--frontier); }
-    .empty { color:var(--muted); font-size:13px; padding:12px 0; }
-    @media (max-width:700px) { header, main { padding:18px; } input { min-width:100%; } .controls { width:100%; } .tree-children { margin-left:10px; padding-left:12px; } }
+    .flow-shell { min-height:calc(100vh - 162px); overflow:auto; background-color:#fff; background-image:radial-gradient(rgba(60,60,67,.14) .7px, transparent .7px); background-size:18px 18px; }
+    .flow-shell svg { display:block; min-width:100%; }
+    .flow-stage { fill:rgba(250,250,250,.72); stroke:rgba(60,60,67,.12); }
+    .flow-stage-title { fill:var(--tertiary); font-size:10px; font-weight:600; }
+    .flow-edge { fill:none; stroke:var(--edge); stroke-width:1.3; marker-end:url(#arrow); }
+    .flow-node rect { fill:#fff; stroke:rgba(60,60,67,.24); stroke-width:1; rx:6; }
+    .flow-node:hover rect { fill:#f7f7f8; stroke:rgba(60,60,67,.38); }
+    .flow-node.selected rect { fill:var(--selection); stroke:var(--selection-strong); stroke-width:1.5; }
+    .flow-node.frontier rect { stroke:var(--frontier); stroke-width:1.7; }
+    .flow-node text { fill:var(--ink); pointer-events:none; }
+    .flow-node .node-id { fill:var(--tertiary); font-size:9px; }
+    .flow-node .node-title { font-size:11px; font-weight:550; }
+    .flow-node .node-status { fill:var(--secondary); font-size:9px; }
+    .inspector {
+      min-width:0;
+      overflow:auto;
+      border-left:1px solid var(--hairline);
+      background:var(--inspector);
+    }
+    .inspector-heading {
+      min-height:64px;
+      display:flex;
+      align-items:center;
+      border-bottom:1px solid var(--hairline);
+      padding:0 16px;
+      font-size:13px;
+      font-weight:600;
+    }
+    .inspector-empty { padding:24px 16px; color:var(--secondary); font-size:12px; line-height:1.5; }
+    .inspector-hero { padding:18px 16px 16px; border-bottom:1px solid var(--hairline); }
+    .inspector-kicker { color:var(--tertiary); font-size:10px; }
+    .inspector-hero h2 { margin:7px 0 10px; font-size:16px; line-height:1.35; letter-spacing:-.02em; }
+    .inspector-status { display:inline-flex; align-items:center; gap:6px; color:var(--secondary); font-size:11px; }
+    .inspector-status::before { content:""; width:7px; height:7px; border-radius:50%; background:#c7c7cc; }
+    .inspector-section { padding:14px 16px; border-bottom:1px solid var(--hairline); }
+    .inspector-section h3 { margin:0 0 9px; color:var(--tertiary); font-size:10px; font-weight:600; }
+    .detail-row { display:grid; grid-template-columns:74px minmax(0,1fr); gap:8px; padding:4px 0; font-size:11px; line-height:1.45; }
+    .detail-row dt { color:var(--secondary); }
+    .detail-row dd { margin:0; overflow-wrap:anywhere; }
+    .tag-list { display:flex; gap:5px; flex-wrap:wrap; }
+    .tag { border:1px solid var(--hairline); border-radius:5px; background:#fff; padding:2px 6px; color:var(--secondary); font-size:10px; }
+    .open-button {
+      width:calc(100% - 32px);
+      min-height:30px;
+      margin:14px 16px;
+      border:0;
+      border-radius:7px;
+      background:var(--selection-strong);
+      color:#fff;
+      font-weight:500;
+    }
+    @media (max-width:1080px) {
+      :root { --source-width:198px; --inspector-width:244px; }
+      .outline-header, .outline-row { grid-template-columns:minmax(220px,1fr) 96px 92px; }
+      .outline-header span:last-child, .outline-row > span:last-child { display:none; }
+    }
+    @media (max-width:820px) {
+      .window { display:block; min-height:100vh; }
+      .titlebar { grid-template-columns:80px minmax(0,1fr) 80px; }
+      .sync-state { overflow:hidden; text-overflow:ellipsis; }
+      .app-body { display:grid; grid-template-columns:1fr; }
+      .source-list { border-right:0; border-bottom:1px solid var(--hairline); padding:8px; }
+      .source-title, .status-list, .sidebar-foot { display:none; }
+      .nav-section { margin:0; }
+      .nav-label { display:none; }
+      .tabs, .effort-list { display:flex; overflow:auto; }
+      .tabs button, .effort-list button { width:auto; min-width:max-content; }
+      .workspace { min-height:620px; }
+      .inspector { border-top:1px solid var(--hairline); border-left:0; }
+      input { width:min(220px,42vw); }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>${escapeHtml(title)}</h1>
-    <div class="meta">Read-only projection · canonical state: issue tracker · generated ${escapeHtml(generatedAt)}</div>
-    <div class="toolbar">
-      <div class="controls">
-        <input id="search" type="search" placeholder="Search title, ID, label, or assignee">
-        <select id="status"><option value="">All statuses</option></select>
-      </div>
-      <div class="tabs" role="tablist" aria-label="Board views">
-        <button id="treeTab" role="tab" aria-controls="treeView" aria-selected="true">Tree</button>
-        <button id="flowTab" role="tab" aria-controls="flowView" aria-selected="false">Flow</button>
-      </div>
+  <div class="window">
+    <header class="titlebar">
+      <div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="window-title">${escapeHtml(title)}</div>
+      <div class="sync-state">${escapeHtml(copy.lastSync)} ${escapeHtml(generatedAt.slice(0, 16).replace("T", " "))}</div>
+    </header>
+    <div class="app-body">
+      <aside class="source-list">
+        <div class="source-title">
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(copy.readOnly)}</span>
+        </div>
+        <div class="nav-section">
+          <div class="nav-label">${escapeHtml(copy.boardViews)}</div>
+          <div class="tabs" role="tablist" aria-label="${escapeHtml(copy.boardViews)}">
+            <button id="treeTab" role="tab" aria-controls="treeView" aria-selected="true">
+              <span class="nav-icon">≡</span><span class="nav-name">${escapeHtml(copy.tree)}</span><span></span>
+            </button>
+            <button id="flowTab" role="tab" aria-controls="flowView" aria-selected="false">
+              <span class="nav-icon">⌘</span><span class="nav-name">${escapeHtml(copy.flow)}</span><span></span>
+            </button>
+          </div>
+        </div>
+        <div class="nav-section">
+          <div class="nav-label">${escapeHtml(copy.statusOverview)}</div>
+          <div id="statusList" class="status-list"></div>
+        </div>
+        <div class="nav-section">
+          <div class="nav-label">${escapeHtml(copy.efforts)}</div>
+          <div id="effortList" class="effort-list"></div>
+        </div>
+        <div class="sidebar-foot">
+          ${escapeHtml(copy.canonical)}<br>
+          ${escapeHtml(copy.readOnly)}
+        </div>
+      </aside>
+      <main class="workspace">
+        <header class="toolbar">
+          <div class="page-heading">
+            <h1 id="viewHeading">${escapeHtml(copy.structure)}</h1>
+            <p id="viewSummary"></p>
+          </div>
+          <div class="controls">
+            <div class="search-wrap">
+              <input id="search" type="search" placeholder="${escapeHtml(copy.searchPlaceholder)}">
+            </div>
+            <select id="status"><option value="">${escapeHtml(copy.allStatuses)}</option></select>
+          </div>
+        </header>
+        <div class="content">
+          <div id="treeView" class="view" role="tabpanel" aria-labelledby="treeTab"></div>
+          <div id="flowView" class="view" role="tabpanel" aria-labelledby="flowTab" hidden></div>
+        </div>
+      </main>
+      <aside class="inspector">
+        <div class="inspector-heading">${escapeHtml(copy.details)}</div>
+        <div id="inspectorContent"></div>
+      </aside>
     </div>
-  </header>
-  <main>
-    <div id="treeView" class="view" role="tabpanel" aria-labelledby="treeTab"></div>
-    <div id="flowView" class="view" role="tabpanel" aria-labelledby="flowTab" hidden></div>
-  </main>
+  </div>
   <script>
     const items = ${safeData};
+    const copy = ${safeCopy};
+    const boardLocale = ${JSON.stringify(locale)};
     const byKey = new Map(items.map(item => [item.key, item]));
     const laneOrder = ["Open","Triage","Ready","Active","Waiting","Blocked","Done"];
     const search = document.querySelector("#search");
     const status = document.querySelector("#status");
     const treeView = document.querySelector("#treeView");
     const flowView = document.querySelector("#flowView");
-    for (const value of laneOrder.filter(lane => items.some(item => item.lane === lane))) status.add(new Option(value, value));
+    const statusList = document.querySelector("#statusList");
+    const effortList = document.querySelector("#effortList");
+    const viewHeading = document.querySelector("#viewHeading");
+    const viewSummary = document.querySelector("#viewSummary");
+    const inspectorContent = document.querySelector("#inspectorContent");
+    let selectedGroup = "";
+    let selectedKey = (items.find(item => item.isFrontier) || items[0] || {}).key || "";
+    for (const value of laneOrder.filter(lane => items.some(item => item.lane === lane))) status.add(new Option(copy.lanes[value] || value, value));
 
     function visibleItems() {
       const needle = search.value.trim().toLowerCase();
       return items.filter(item => {
         const haystack = [item.id,item.title,item.type,item.state,item.group,...item.labels,...item.assignees].join(" ").toLowerCase();
-        return (!needle || haystack.includes(needle)) && (!status.value || item.lane === status.value);
+        return (!needle || haystack.includes(needle)) &&
+          (!status.value || item.lane === status.value) &&
+          (!selectedGroup || (item.group || item.source) === selectedGroup);
       });
     }
 
-    function ticketCard(item) {
-      const card = Object.assign(document.createElement("div"), { className:"ticket-card" + (item.isFrontier ? " frontier" : "") });
-      const eyebrow = Object.assign(document.createElement("div"), { className:"eyebrow" });
-      eyebrow.append(
-        Object.assign(document.createElement("span"), { textContent:item.id + " · " + item.type }),
-        Object.assign(document.createElement("span"), { className:"status", textContent:item.isFrontier ? "Frontier" : item.lane })
-      );
-      const link = Object.assign(document.createElement("a"), { href:item.url, textContent:item.title });
-      if (item.url.startsWith("http")) link.target = "_blank";
-      const tags = Object.assign(document.createElement("div"), { className:"tags" });
-      for (const tag of [...item.labels, ...item.assignees.map(value => "@" + value)]) {
-        tags.append(Object.assign(document.createElement("span"), { className:"tag", textContent:tag }));
+    function formatDate(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return copy.notAvailable;
+      return new Intl.DateTimeFormat(boardLocale, { month:"short", day:"numeric" }).format(date);
+    }
+
+    function selectItem(item) {
+      selectedKey = item.key;
+      render();
+    }
+
+    function renderInspector() {
+      const item = byKey.get(selectedKey);
+      if (!item) {
+        inspectorContent.replaceChildren(Object.assign(document.createElement("div"), {
+          className:"inspector-empty",
+          textContent:copy.noSelection,
+        }));
+        return;
       }
-      card.append(eyebrow, link, tags);
-      return card;
+      const hero = Object.assign(document.createElement("section"), { className:"inspector-hero" });
+      hero.append(
+        Object.assign(document.createElement("div"), {
+          className:"inspector-kicker",
+          textContent:item.id + " · " + (copy.types[item.type] || item.type),
+        }),
+        Object.assign(document.createElement("h2"), { textContent:item.title }),
+        Object.assign(document.createElement("div"), {
+          className:"inspector-status",
+          textContent:item.isFrontier ? copy.currentFrontier : (copy.lanes[item.lane] || item.lane),
+        }),
+      );
+      const details = Object.assign(document.createElement("section"), { className:"inspector-section" });
+      details.append(Object.assign(document.createElement("h3"), { textContent:copy.properties }));
+      const list = document.createElement("dl");
+      const rows = [
+        [copy.type, copy.types[item.type] || item.type],
+        [copy.state, copy.lanes[item.lane] || item.lane],
+        [copy.effort, item.group || item.source],
+        [copy.updated, formatDate(item.updatedAt)],
+        [copy.source, item.source],
+      ];
+      for (const [label, value] of rows) {
+        const row = Object.assign(document.createElement("div"), { className:"detail-row" });
+        row.append(
+          Object.assign(document.createElement("dt"), { textContent:label }),
+          Object.assign(document.createElement("dd"), { textContent:value || copy.notAvailable }),
+        );
+        list.append(row);
+      }
+      details.append(list);
+      const relations = Object.assign(document.createElement("section"), { className:"inspector-section" });
+      relations.append(Object.assign(document.createElement("h3"), { textContent:copy.relationships }));
+      const relationList = document.createElement("dl");
+      const blockerNames = item.blockedBy.map(key => byKey.get(key)?.id || key);
+      const parent = item.parentId ? byKey.get(item.parentId) : null;
+      for (const [label, value] of [
+        [copy.parent, parent ? parent.id + " · " + parent.title : copy.none],
+        [copy.blockedBy, blockerNames.length ? blockerNames.join(", ") : copy.none],
+      ]) {
+        const row = Object.assign(document.createElement("div"), { className:"detail-row" });
+        row.append(
+          Object.assign(document.createElement("dt"), { textContent:label }),
+          Object.assign(document.createElement("dd"), { textContent:value }),
+        );
+        relationList.append(row);
+      }
+      relations.append(relationList);
+      const tags = [...item.labels, ...item.assignees.map(value => "@" + value)];
+      if (tags.length) {
+        const tagSection = Object.assign(document.createElement("section"), { className:"inspector-section" });
+        tagSection.append(Object.assign(document.createElement("h3"), { textContent:copy.labelsAndPeople }));
+        const tagList = Object.assign(document.createElement("div"), { className:"tag-list" });
+        for (const tag of tags) tagList.append(Object.assign(document.createElement("span"), { className:"tag", textContent:tag }));
+        tagSection.append(tagList);
+        inspectorContent.replaceChildren(hero, details, relations, tagSection, openButton(item));
+      } else {
+        inspectorContent.replaceChildren(hero, details, relations, openButton(item));
+      }
+    }
+
+    function openButton(item) {
+      const button = Object.assign(document.createElement("button"), {
+        className:"open-button",
+        textContent:copy.openOriginal,
+      });
+      button.addEventListener("click", () => window.open(item.url, item.url.startsWith("http") ? "_blank" : "_self"));
+      return button;
+    }
+
+    function initializeSidebar() {
+      const summaryRows = [
+        ["frontier", copy.currentFrontier, items.filter(item => item.isFrontier).length],
+        ["blocked", copy.blockedItems, items.filter(item => item.lane === "Blocked").length],
+        ["done", copy.completedItems, items.filter(item => item.lane === "Done").length]
+      ];
+      statusList.replaceChildren(...summaryRows.map(([className, label, value]) => {
+        const row = Object.assign(document.createElement("div"), { className:"status-row" });
+        row.append(
+          Object.assign(document.createElement("i"), { className:"status-dot " + className }),
+          Object.assign(document.createElement("span"), { textContent:label }),
+          Object.assign(document.createElement("span"), { textContent:String(value) })
+        );
+        return row;
+      }));
+
+      const groups = [...new Set(items.map(item => item.group || item.source))].sort();
+      const choices = [["", copy.allEfforts, items.length], ...groups.map(group => [
+        group,
+        group,
+        items.filter(item => (item.group || item.source) === group).length
+      ])];
+      effortList.replaceChildren(...choices.map(([value, label, count]) => {
+        const button = document.createElement("button");
+        button.className = value === selectedGroup ? "active" : "";
+        button.append(
+          Object.assign(document.createElement("span"), { className:"nav-icon", textContent:value ? "◇" : "◫" }),
+          Object.assign(document.createElement("span"), { className:"nav-name", textContent:label }),
+          Object.assign(document.createElement("span"), { className:"nav-count", textContent:String(count) })
+        );
+        button.addEventListener("click", () => {
+          selectedGroup = value;
+          initializeSidebar();
+          render();
+        });
+        return button;
+      }));
+    }
+
+    function outlineRow(item, depth) {
+      const row = Object.assign(document.createElement("button"), {
+        className:"outline-row lane-" + item.lane + (item.isFrontier ? " frontier" : "") + (item.key === selectedKey ? " selected" : ""),
+        type:"button",
+      });
+      row.style.setProperty("--depth", String(depth));
+      const name = Object.assign(document.createElement("span"), { className:"item-name" });
+      const itemCopy = Object.assign(document.createElement("span"), { className:"item-copy" });
+      itemCopy.append(
+        Object.assign(document.createElement("strong"), { textContent:item.title }),
+        Object.assign(document.createElement("small"), { textContent:item.id }),
+      );
+      name.append(Object.assign(document.createElement("i"), { className:"item-marker" }), itemCopy);
+      row.append(
+        name,
+        Object.assign(document.createElement("span"), {
+          className:"cell-muted",
+          textContent:copy.types[item.type] || item.type,
+        }),
+        Object.assign(document.createElement("span"), {
+          className:"state-label",
+          textContent:item.isFrontier ? copy.frontier : (copy.lanes[item.lane] || item.lane),
+        }),
+        Object.assign(document.createElement("span"), {
+          className:"cell-muted",
+          textContent:formatDate(item.updatedAt),
+        }),
+      );
+      row.addEventListener("click", () => selectItem(item));
+      row.addEventListener("dblclick", () => window.open(item.url, item.url.startsWith("http") ? "_blank" : "_self"));
+      return row;
     }
 
     function renderTree(visible) {
       const visibleKeys = new Set(visible.map(item => item.key));
       const groups = [...new Set(visible.map(item => item.group || item.source))].sort();
       const root = Object.assign(document.createElement("div"), { className:"tree-root" });
-      const rootCard = Object.assign(document.createElement("div"), { className:"root-card" });
-      rootCard.append(
-        Object.assign(document.createElement("strong"), { textContent:${JSON.stringify(title)} }),
-        Object.assign(document.createElement("span"), { textContent:visible.length + " visible item(s)" })
-      );
-      const groupList = Object.assign(document.createElement("div"), { className:"groups" });
+      const header = Object.assign(document.createElement("div"), { className:"outline-header" });
+      for (const label of [copy.name, copy.type, copy.state, copy.updated]) {
+        header.append(Object.assign(document.createElement("span"), { textContent:label }));
+      }
+      const groupList = document.createElement("div");
       for (const groupName of groups) {
         const groupItems = visible.filter(item => (item.group || item.source) === groupName);
         const details = Object.assign(document.createElement("details"), { className:"group", open:true });
@@ -570,7 +993,7 @@ function htmlDocument(items) {
           Object.assign(document.createElement("span"), { className:"group-title", textContent:groupName }),
           Object.assign(document.createElement("span"), { className:"count", textContent:String(groupItems.length) })
         );
-        const list = Object.assign(document.createElement("div"), { className:"tree-list" });
+        const list = document.createElement("div");
         const children = new Map();
         for (const item of groupItems) {
           if (item.parentId && visibleKeys.has(item.parentId)) {
@@ -580,28 +1003,24 @@ function htmlDocument(items) {
         }
         const roots = groupItems.filter(item => !item.parentId || !visibleKeys.has(item.parentId));
         const rendered = new Set();
-        function branch(item, ancestry = new Set()) {
-          const wrapper = Object.assign(document.createElement("div"), { className:"tree-branch" });
-          wrapper.append(ticketCard(item));
+        function branch(item, depth = 0, ancestry = new Set()) {
+          const fragment = document.createDocumentFragment();
+          fragment.append(outlineRow(item, depth));
           rendered.add(item.key);
-          if (ancestry.has(item.key)) return wrapper;
+          if (ancestry.has(item.key)) return fragment;
           const nextAncestry = new Set(ancestry);
           nextAncestry.add(item.key);
           const childItems = (children.get(item.key) || []).sort((a,b) => a.id.localeCompare(b.id, undefined, { numeric:true }));
-          if (childItems.length > 0) {
-            const childList = Object.assign(document.createElement("div"), { className:"tree-children" });
-            for (const child of childItems) childList.append(branch(child, nextAncestry));
-            wrapper.append(childList);
-          }
-          return wrapper;
+          for (const child of childItems) fragment.append(branch(child, depth + 1, nextAncestry));
+          return fragment;
         }
         for (const item of roots.sort((a,b) => a.id.localeCompare(b.id, undefined, { numeric:true }))) list.append(branch(item));
         for (const item of groupItems.filter(item => !rendered.has(item.key))) list.append(branch(item));
         details.append(summary, list);
         groupList.append(details);
       }
-      if (groups.length === 0) groupList.append(Object.assign(document.createElement("div"), { className:"empty", textContent:"No matching items" }));
-      root.append(rootCard, groupList);
+      if (groups.length === 0) groupList.append(Object.assign(document.createElement("div"), { className:"empty", textContent:copy.noItems }));
+      root.append(header, groupList);
       treeView.replaceChildren(root);
     }
 
@@ -627,18 +1046,23 @@ function htmlDocument(items) {
       for (const column of columns.values()) column.sort((a,b) => a.id.localeCompare(b.id, undefined, { numeric:true }));
       const maxDepth = Math.max(0, ...columns.keys());
       const maxRows = Math.max(1, ...[...columns.values()].map(column => column.length));
-      const nodeWidth = 224;
-      const nodeHeight = 76;
-      const gapX = 92;
-      const gapY = 34;
-      const margin = 40;
-      const width = margin * 2 + (maxDepth + 1) * nodeWidth + maxDepth * gapX;
-      const height = margin * 2 + maxRows * nodeHeight + Math.max(0, maxRows - 1) * gapY;
+      const nodeWidth = 210;
+      const nodeHeight = 64;
+      const gapX = 74;
+      const gapY = 24;
+      const marginX = 28;
+      const marginTop = 54;
+      const marginBottom = 28;
+      const width = marginX * 2 + (maxDepth + 1) * nodeWidth + maxDepth * gapX;
+      const height = Math.max(
+        470,
+        marginTop + marginBottom + maxRows * nodeHeight + Math.max(0, maxRows - 1) * gapY,
+      );
       const positions = new Map();
       for (const [columnDepth, column] of columns) {
         column.forEach((item, index) => positions.set(item.key, {
-          x:margin + columnDepth * (nodeWidth + gapX),
-          y:margin + index * (nodeHeight + gapY)
+          x:marginX + columnDepth * (nodeWidth + gapX),
+          y:marginTop + index * (nodeHeight + gapY)
         }));
       }
       const shell = Object.assign(document.createElement("div"), { className:"flow-shell" });
@@ -661,6 +1085,22 @@ function htmlDocument(items) {
       marker.append(arrow);
       defs.append(marker);
       svg.append(defs);
+      for (let columnDepth = 0; columnDepth <= maxDepth; columnDepth += 1) {
+        const x = marginX + columnDepth * (nodeWidth + gapX);
+        const stage = document.createElementNS(svg.namespaceURI, "rect");
+        stage.setAttribute("class", "flow-stage");
+        stage.setAttribute("x", String(x - 10));
+        stage.setAttribute("y", "12");
+        stage.setAttribute("width", String(nodeWidth + 20));
+        stage.setAttribute("height", String(height - 24));
+        stage.setAttribute("rx", "7");
+        const stageTitle = document.createElementNS(svg.namespaceURI, "text");
+        stageTitle.setAttribute("class", "flow-stage-title");
+        stageTitle.setAttribute("x", String(x));
+        stageTitle.setAttribute("y", "34");
+        stageTitle.textContent = copy.stage + " " + (columnDepth + 1);
+        svg.append(stage, stageTitle);
+      }
       for (const item of visible) {
         const target = positions.get(item.key);
         for (const blockerKey of item.blockedBy) {
@@ -681,9 +1121,9 @@ function htmlDocument(items) {
       for (const item of visible) {
         const position = positions.get(item.key);
         const group = document.createElementNS(svg.namespaceURI, "g");
-        group.setAttribute("class", "flow-node" + (item.isFrontier ? " frontier" : ""));
+        group.setAttribute("class", "flow-node lane-" + item.lane + (item.isFrontier ? " frontier" : "") + (item.key === selectedKey ? " selected" : ""));
         group.setAttribute("transform", "translate(" + position.x + " " + position.y + ")");
-        group.setAttribute("role", "link");
+        group.setAttribute("role", "button");
         group.setAttribute("tabindex", "0");
         group.style.cursor = "pointer";
         const rect = document.createElementNS(svg.namespaceURI, "rect");
@@ -691,47 +1131,54 @@ function htmlDocument(items) {
         rect.setAttribute("height", String(nodeHeight));
         const idText = document.createElementNS(svg.namespaceURI, "text");
         idText.setAttribute("class", "node-id");
-        idText.setAttribute("x", "14");
-        idText.setAttribute("y", "19");
-        idText.textContent = item.id + " · " + item.type;
+        idText.setAttribute("x", "12");
+        idText.setAttribute("y", "16");
+        idText.textContent = item.id + " · " + (copy.types[item.type] || item.type);
         const titleText = document.createElementNS(svg.namespaceURI, "text");
         titleText.setAttribute("class", "node-title");
-        titleText.setAttribute("x", "14");
-        titleText.setAttribute("y", "42");
-        titleText.textContent = item.title.length > 29 ? item.title.slice(0, 28) + "…" : item.title;
+        titleText.setAttribute("x", "12");
+        titleText.setAttribute("y", "36");
+        titleText.textContent = item.title.length > 27 ? item.title.slice(0, 26) + "…" : item.title;
         const statusText = document.createElementNS(svg.namespaceURI, "text");
         statusText.setAttribute("class", "node-status");
-        statusText.setAttribute("x", "14");
-        statusText.setAttribute("y", "62");
-        statusText.textContent = item.isFrontier ? "Frontier" : item.lane;
-        const open = () => window.open(item.url, item.url.startsWith("http") ? "_blank" : "_self");
-        group.addEventListener("click", open);
+        statusText.setAttribute("x", "12");
+        statusText.setAttribute("y", "53");
+        statusText.textContent = item.isFrontier ? copy.frontier : (copy.lanes[item.lane] || item.lane);
+        group.addEventListener("click", () => selectItem(item));
+        group.addEventListener("dblclick", () => window.open(item.url, item.url.startsWith("http") ? "_blank" : "_self"));
         group.addEventListener("keydown", event => {
-          if (event.key === "Enter" || event.key === " ") open();
+          if (event.key === "Enter" || event.key === " ") selectItem(item);
         });
         group.append(rect, idText, titleText, statusText);
         svg.append(group);
       }
       if (visible.length === 0) {
-        shell.append(Object.assign(document.createElement("div"), { className:"empty", textContent:"No matching items" }));
+        shell.append(Object.assign(document.createElement("div"), { className:"empty", textContent:copy.noItems }));
       } else {
         shell.append(svg);
       }
       const legend = Object.assign(document.createElement("div"), { className:"legend" });
       const standard = document.createElement("span");
-      standard.append(document.createElement("i"), "Ticket");
+      standard.append(document.createElement("i"), copy.ticket);
       const frontier = Object.assign(document.createElement("span"), { className:"frontier-key" });
-      frontier.append(document.createElement("i"), "Current frontier");
+      frontier.append(document.createElement("i"), copy.currentFrontier);
       const relation = document.createElement("span");
-      relation.append("Arrow: blocker → blocked ticket");
+      relation.append(copy.arrowMeaning);
       legend.append(standard, frontier, relation);
-      flowView.replaceChildren(legend, shell);
+      const header = Object.assign(document.createElement("div"), { className:"flow-head" });
+      header.append(
+        Object.assign(document.createElement("span"), { textContent:copy.flowSubtitle }),
+        legend,
+      );
+      flowView.replaceChildren(header, shell);
     }
 
     function render() {
       const visible = visibleItems();
+      viewSummary.textContent = copy.visibleCount.replace("{count}", visible.length);
       renderTree(visible);
       renderFlow(visible);
+      renderInspector();
     }
 
     function selectView(name) {
@@ -740,11 +1187,14 @@ function htmlDocument(items) {
       document.querySelector("#flowTab").setAttribute("aria-selected", String(!treeSelected));
       treeView.hidden = !treeSelected;
       flowView.hidden = treeSelected;
+      viewHeading.textContent = treeSelected ? copy.structure : copy.dependencies;
+      viewSummary.textContent = copy.visibleCount.replace("{count}", visibleItems().length);
     }
     search.addEventListener("input", render);
     status.addEventListener("change", render);
     document.querySelector("#treeTab").addEventListener("click", () => selectView("tree"));
     document.querySelector("#flowTab").addEventListener("click", () => selectView("flow"));
+    initializeSidebar();
     render();
   </script>
 </body>
@@ -827,6 +1277,135 @@ function tryRun(binary, binaryArgs, options = {}) {
   } catch {
     return null;
   }
+}
+
+function boardCopy(locale) {
+  if (locale === "zh-CN") {
+    return {
+      readOnly: "只读视图",
+      canonical: "权威状态：Issue Tracker",
+      generated: "生成于",
+      lastSync: "最近同步：",
+      projectControl: "项目控制台",
+      statusOverview: "状态概览",
+      efforts: "工作流",
+      allEfforts: "全部工作流",
+      searchPlaceholder: "搜索标题、编号、标签或负责人",
+      allStatuses: "全部状态",
+      boardViews: "看板视图",
+      tree: "树状图",
+      flow: "流程图",
+      structure: "项目结构",
+      dependencies: "依赖流程",
+      treeSubtitle: "按工作流和父子关系组织全部事项",
+      flowSubtitle: "从阻塞项到被阻塞事项的执行路径",
+      frontier: "当前前沿",
+      currentFrontier: "当前可执行前沿",
+      ticket: "事项",
+      totalItems: "全部事项",
+      blockedItems: "阻塞事项",
+      completedItems: "已完成",
+      stage: "阶段",
+      arrowMeaning: "箭头：阻塞项 → 被阻塞事项",
+      visibleCount: "{count} 个可见事项",
+      noItems: "没有匹配事项",
+      details: "事项详情",
+      noSelection: "选择一个事项后，可在这里查看它的状态、归属和依赖关系。",
+      properties: "属性",
+      relationships: "关系",
+      labelsAndPeople: "标签与负责人",
+      name: "名称",
+      type: "类型",
+      state: "状态",
+      effort: "工作流",
+      updated: "更新",
+      source: "来源",
+      parent: "父事项",
+      blockedBy: "阻塞于",
+      none: "无",
+      notAvailable: "未记录",
+      openOriginal: "打开原事项",
+      lanes: {
+        Open: "待处理",
+        Triage: "待审查",
+        Ready: "可开始",
+        Active: "进行中",
+        Waiting: "等待中",
+        Blocked: "被阻塞",
+        Done: "已完成",
+      },
+      types: {
+        issue: "Issue",
+        ticket: "票据",
+        task: "任务",
+        grilling: "产品确认",
+        research: "研究",
+        prototype: "原型",
+      },
+    };
+  }
+  return {
+    readOnly: "Read-only projection",
+    canonical: "canonical state: issue tracker",
+    generated: "generated",
+    lastSync: "Last sync:",
+    projectControl: "Project control",
+    statusOverview: "Status overview",
+    efforts: "Efforts",
+    allEfforts: "All efforts",
+    searchPlaceholder: "Search title, ID, label, or assignee",
+    allStatuses: "All statuses",
+    boardViews: "Board views",
+    tree: "Tree",
+    flow: "Flow",
+    structure: "Project structure",
+    dependencies: "Dependency flow",
+    treeSubtitle: "All items organized by effort and parent-child relationship",
+    flowSubtitle: "Execution path from blocker to blocked item",
+    frontier: "Frontier",
+    currentFrontier: "Current frontier",
+    ticket: "Ticket",
+    totalItems: "All items",
+    blockedItems: "Blocked",
+    completedItems: "Completed",
+    stage: "Stage",
+    arrowMeaning: "Arrow: blocker → blocked ticket",
+    visibleCount: "{count} visible item(s)",
+    noItems: "No matching items",
+    details: "Item details",
+    noSelection: "Select an item to inspect its state, scope, and dependencies.",
+    properties: "Properties",
+    relationships: "Relationships",
+    labelsAndPeople: "Labels & assignees",
+    name: "Name",
+    type: "Type",
+    state: "State",
+    effort: "Effort",
+    updated: "Updated",
+    source: "Source",
+    parent: "Parent",
+    blockedBy: "Blocked by",
+    none: "None",
+    notAvailable: "Not recorded",
+    openOriginal: "Open original item",
+    lanes: {
+      Open: "Open",
+      Triage: "Triage",
+      Ready: "Ready",
+      Active: "Active",
+      Waiting: "Waiting",
+      Blocked: "Blocked",
+      Done: "Done",
+    },
+    types: {
+      issue: "Issue",
+      ticket: "Ticket",
+      task: "Task",
+      grilling: "Product decision",
+      research: "Research",
+      prototype: "Prototype",
+    },
+  };
 }
 
 function escapeHtml(value) {

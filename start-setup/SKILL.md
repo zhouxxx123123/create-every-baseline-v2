@@ -90,6 +90,8 @@ For a GitHub surface, confirm the exact project owner and title. Verify `gh auth
 
 For local HTML, default to port `4173`; choose another free localhost port without asking only when `4173` is occupied. The server must bind to `127.0.0.1`, expose only the board and explicitly selected local Markdown source files, and never bind to a public interface.
 
+Set the board interface language from the user's setup language or an existing repository convention: use `zh-CN` for a Chinese setup conversation and `en` for an English setup conversation. Record the chosen locale without adding another question unless the signals conflict. This localizes board controls, states, legends, and known ticket types; canonical titles and labels remain unchanged.
+
 The local HTML surface always provides two tabs:
 
 - **Tree** — repository/project -> effort or map -> parent ticket -> child ticket, using canonical parent/sub-issue relationships when available;
@@ -111,7 +113,8 @@ Use this machine-config shape, omitting tracker-specific properties that do not 
 ```json
 {
   "schemaVersion": 1,
-  "title": "Project Board",
+  "title": "项目看板",
+  "locale": "zh-CN",
   "canonicalTracker": "github",
   "repoRoot": "..",
   "github": {
