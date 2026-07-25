@@ -87,3 +87,19 @@ node "<resolved-skill-router-dir>/scripts/audit-skill-registry.mjs" \
 ```
 
 Add `--forbid <old-name>` once for every retired invocation name. The audit checks required metadata, valid and unique skill names, UI metadata, compatibility-directory mismatches, explicit invocations, forbidden legacy references, and retired top-level paths or symlinks. Unknown invocations are warnings because a skill may intentionally call a built-in or externally installed command; duplicate names, malformed metadata, and forbidden names are errors.
+
+After a rename, also audit the user-level integration surfaces that can restore
+or invoke stale names:
+
+```bash
+node "<resolved-skill-router-dir>/scripts/audit-skill-integrations.mjs" \
+  /Users/<user>/.agents/skills \
+  --forbid <retired-name> \
+  --project <active-project-root>
+```
+
+This checks the installation lock, portable transfer packs, Claude skill
+symlinks, OpenCode commands/configuration, and each explicitly supplied project.
+It ignores frozen snapshots, backups, generated outputs, dependency trees, and
+source-reference clones so historical evidence and upstream attribution do not
+become false failures.
