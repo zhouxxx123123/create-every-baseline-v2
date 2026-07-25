@@ -132,7 +132,7 @@ Do not invent hierarchy or dependencies from title similarity, numbering proximi
 For every enabled board:
 
 1. record human-facing authority and recovery instructions in `docs/agents/project-board.md` using [project-board.md](./project-board.md);
-2. create `.project-board/config.json` with `schemaVersion`, `title`, `canonicalTracker`, `repoRoot`, tracker identity, and enabled surfaces;
+2. create `.project-board/config.json` with `schemaVersion`, `adapterVersion`, `title`, `canonicalTracker`, `repoRoot`, tracker identity, and enabled surfaces;
 3. copy [scripts/project-board.mjs](./scripts/project-board.mjs) to `.project-board/project-board.mjs`;
 4. add `.project-board/index.html` to `.gitignore` because it is generated, while keeping the config and script tracked;
 5. run `node .project-board/project-board.mjs sync`;
@@ -143,6 +143,7 @@ Use this machine-config shape, omitting tracker-specific properties that do not 
 ```json
 {
   "schemaVersion": 1,
+  "adapterVersion": 2,
   "title": "项目看板",
   "locale": "zh-CN",
   "canonicalTracker": "github",
@@ -183,6 +184,16 @@ Use this machine-config shape, omitting tracker-specific properties that do not 
 ```
 
 The bundled adapter supports GitHub Issues and Local Markdown. A GitLab or custom tracker needs a separately confirmed adapter before local HTML can be enabled; do not pretend an unsupported tracker is synchronized.
+
+Before declaring a board current, run `node .project-board/project-board.mjs doctor`. A missing or mismatched `adapterVersion`, invalid port, unsupported tracker, missing Local Markdown root, or repository-escaping source/output path is a setup-repair blocker. Existing projects receive adapter upgrades only through `UPDATE_BOARD`; copied adapters never silently mutate themselves.
+
+After changing the bundled adapter or launcher, run the dependency-free regression suite:
+
+```bash
+node "<resolved-start-setup-skill-dir>/scripts/test-project-board.mjs"
+```
+
+It verifies canonical hierarchy, Map frontier authority, no invented specification, sub-issue relationships, config path containment, source symlink containment, localhost health identity, and live refresh.
 
 The issue tracker remains canonical. GitHub Project and local HTML must not own separate decisions, blockers, lifecycle states, or copies of ticket content. After a successful canonical tracker write, skills follow `docs/agents/project-board.md` and run its sync command. A projection failure does not roll back a canonical write, but it must be reported accurately with the recovery command.
 

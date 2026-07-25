@@ -2,6 +2,7 @@
 
 - Setup workflow: `FULL_SETUP | UPDATE_BOARD`
 - Mode: `NONE | LOCAL_HTML | GITHUB_PROJECT | DUAL`
+- Adapter version: `2`
 - Canonical state: `ISSUE_TRACKER`
 - Interface language: `zh-CN | en`
 - GitHub Project: `<URL or Not configured>`
@@ -10,6 +11,7 @@
 - Local views: `Tree | Flow`
 - Machine config: `.project-board/config.json`
 - Quick open command: `board`
+- Doctor command: `node .project-board/project-board.mjs doctor`
 - Sync command: `node .project-board/project-board.mjs sync`
 - Serve command: `node .project-board/project-board.mjs serve`
 - Live refresh: `Local Markdown watch | GitHub polling | Disabled`

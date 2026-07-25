@@ -82,7 +82,8 @@ After installing, removing, or renaming local skills, run the bundled registry a
 
 ```bash
 node "<resolved-skill-router-dir>/scripts/audit-skill-registry.mjs" \
-  /Users/<user>/.agents/skills
+  /Users/<user>/.agents/skills \
+  --forbid <retired-name>
 ```
 
-Add `--forbid <old-name>` once for every retired invocation name. The audit checks required metadata, valid and unique skill names, UI metadata, compatibility-directory mismatches, explicit invocations, and forbidden legacy references. Unknown invocations are warnings because a skill may intentionally call a built-in or externally installed command; duplicate names, malformed metadata, and forbidden names are errors.
+Add `--forbid <old-name>` once for every retired invocation name. The audit checks required metadata, valid and unique skill names, UI metadata, compatibility-directory mismatches, explicit invocations, forbidden legacy references, and retired top-level paths or symlinks. Unknown invocations are warnings because a skill may intentionally call a built-in or externally installed command; duplicate names, malformed metadata, and forbidden names are errors.

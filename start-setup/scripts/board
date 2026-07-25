@@ -2,6 +2,7 @@
 
 set -eu
 
+expected_adapter_version=2
 cursor=${1:-"$PWD"}
 if [ ! -d "$cursor" ]; then
   printf 'board: project path is not a directory: %s\n' "$cursor" >&2
@@ -30,27 +31,54 @@ local_port=$(
     const fs = require("node:fs");
     const config = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
     const local = config.surfaces?.localHtml;
-    process.stdout.write(local?.enabled ? String(local.port || 4173) : "DISABLED");
+    process.stdout.write(
+      local?.enabled
+        ? `${config.adapterVersion ?? "UNVERSIONED"}:${local.port || 4173}`
+        : "DISABLED",
+    );
   ' "$config"
 )
 if [ "$local_port" = "DISABLED" ]; then
   printf 'board: the local HTML surface is not enabled for this project.\n' >&2
   exit 1
 fi
+configured_adapter_version=${local_port%%:*}
+local_port=${local_port#*:}
+if [ "$configured_adapter_version" != "$expected_adapter_version" ]; then
+  printf 'board: project adapter is outdated (%s, expected %s); run $start-setup in update-board mode.\n' \
+    "$configured_adapter_version" "$expected_adapter_version" >&2
+  exit 1
+fi
 
 url="http://127.0.0.1:$local_port/"
-if page=$(curl -fsS --max-time 1 "$url" 2>/dev/null); then
-  case "$page" in
-    *'id="treeView"'*'id="flowView"'*)
-      open "$url"
-      printf 'Project board already running: %s\n' "$url"
-      exit 0
-      ;;
-    *)
-      printf 'board: port %s is occupied by another local service.\n' "$local_port" >&2
-      exit 1
-      ;;
-  esac
+open_url() {
+  if command -v open >/dev/null 2>&1; then
+    open "$1"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$1"
+  else
+    printf 'Open this URL: %s\n' "$1"
+  fi
+}
+
+if health=$(curl -fsS --max-time 1 "${url}health" 2>/dev/null); then
+  running_adapter_version=$(
+    node -e '
+      const health = JSON.parse(process.argv[1]);
+      process.stdout.write(String(health.adapterVersion ?? "UNKNOWN"));
+    ' "$health"
+  )
+  if [ "$running_adapter_version" != "$expected_adapter_version" ]; then
+    printf 'board: running server uses adapter %s, expected %s.\n' \
+      "$running_adapter_version" "$expected_adapter_version" >&2
+    exit 1
+  fi
+  open_url "$url"
+  printf 'Project board already running: %s\n' "$url"
+  exit 0
+elif curl -fsS --max-time 1 "$url" >/dev/null 2>&1; then
+  printf 'board: port %s is occupied by another or outdated local service.\n' "$local_port" >&2
+  exit 1
 fi
 
 cd "$cursor"
@@ -69,10 +97,16 @@ while [ "$attempt" -lt 50 ]; do
     wait "$server_pid"
     exit $?
   fi
-  if page=$(curl -fsS --max-time 1 "$url" 2>/dev/null); then
-    case "$page" in
-      *'id="treeView"'*'id="flowView"'*) break ;;
-    esac
+  if health=$(curl -fsS --max-time 1 "${url}health" 2>/dev/null); then
+    running_adapter_version=$(
+      node -e '
+        const health = JSON.parse(process.argv[1]);
+        process.stdout.write(String(health.adapterVersion ?? "UNKNOWN"));
+      ' "$health"
+    )
+    if [ "$running_adapter_version" = "$expected_adapter_version" ]; then
+      break
+    fi
   fi
   attempt=$((attempt + 1))
   sleep 0.1
@@ -83,7 +117,7 @@ if [ "$attempt" -ge 50 ]; then
   exit 1
 fi
 
-open "$url"
+open_url "$url"
 printf 'Project board running: %s\nPress Ctrl+C to stop.\n' "$url"
 wait "$server_pid"
 trap - EXIT HUP INT TERM

@@ -6,8 +6,17 @@ import http from "node:http";
 import path from "node:path";
 import process from "node:process";
 
+const ADAPTER_VERSION = 2;
+const CONFIG_SCHEMA_VERSION = 1;
 const args = process.argv.slice(2);
-const command = args.find((arg) => ["sync", "render", "serve"].includes(arg)) || "sync";
+const command =
+  args.find((arg) =>
+    ["sync", "render", "serve", "doctor", "version"].includes(arg),
+  ) || "sync";
+if (command === "version") {
+  process.stdout.write(`${ADAPTER_VERSION}\n`);
+  process.exit(0);
+}
 const configFlag = args.indexOf("--config");
 if (configFlag >= 0 && !args[configFlag + 1]) {
   fail("--config requires a path");
@@ -22,6 +31,7 @@ if (!fs.existsSync(configPath)) {
 
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 const repoRoot = path.resolve(path.dirname(configPath), config.repoRoot || "..");
+validateConfig();
 
 if (command === "sync") {
   const items = loadItems();
@@ -33,8 +43,103 @@ if (command === "sync") {
   const items = loadItems();
   renderLocalHtml(items);
   serveLocalHtml(items);
+} else if (command === "doctor") {
+  const items = loadItems();
+  const frontiers = items.filter((item) => item.isFrontier);
+  process.stdout.write(
+    `Project board configuration valid (adapter ${ADAPTER_VERSION}, ${items.length} item(s), ${frontiers.length} frontier(s)).\n`,
+  );
 } else {
-  fail("Usage: project-board.mjs [sync|render|serve] [--config <path>]");
+  fail(
+    "Usage: project-board.mjs [sync|render|serve|doctor|version] [--config <path>]",
+  );
+}
+
+function validateConfig() {
+  if (config.schemaVersion !== CONFIG_SCHEMA_VERSION) {
+    fail(
+      `Unsupported config schemaVersion: ${config.schemaVersion ?? "missing"}; expected ${CONFIG_SCHEMA_VERSION}`,
+    );
+  }
+  if (config.adapterVersion !== ADAPTER_VERSION) {
+    fail(
+      `Project board adapter mismatch: config requires ${config.adapterVersion ?? "an unversioned adapter"}, installed adapter is ${ADAPTER_VERSION}. Run $start-setup in update-board mode.`,
+    );
+  }
+  if (!fs.existsSync(repoRoot) || !fs.statSync(repoRoot).isDirectory()) {
+    fail(`repoRoot is not a directory: ${repoRoot}`);
+  }
+  if (!["github", "local-markdown"].includes(config.canonicalTracker)) {
+    fail(`Unsupported canonicalTracker: ${config.canonicalTracker}`);
+  }
+
+  const local = config.surfaces?.localHtml;
+  if (local?.enabled) {
+    const port = Number(local.port || 4173);
+    if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+      fail(`Invalid local HTML port: ${local.port}`);
+    }
+    resolveRepoPath(local.output || ".project-board/index.html", "local HTML output");
+  }
+
+  if (config.canonicalTracker === "local-markdown") {
+    const roots = config.localMarkdown?.roots || [".scratch"];
+    if (!Array.isArray(roots) || roots.length === 0) {
+      fail("localMarkdown.roots must contain at least one repository-relative directory");
+    }
+    for (const root of roots) {
+      const rootPath = resolveRepoPath(root, "Local Markdown root");
+      if (!fs.existsSync(rootPath) || !fs.statSync(rootPath).isDirectory()) {
+        fail(`Local Markdown root is not a directory: ${root}`);
+      }
+      assertRealPathWithinRepo(rootPath, "Local Markdown root");
+    }
+  }
+
+  if (config.canonicalTracker === "github") {
+    if (!/^[^/\s]+\/[^/\s]+$/.test(config.github?.repository || "")) {
+      fail("github.repository must use owner/repository format");
+    }
+  }
+
+  const project = config.surfaces?.githubProject;
+  if (project?.enabled) {
+    if (config.canonicalTracker !== "github") {
+      fail("GitHub Project projection requires GitHub Issues as the canonical tracker");
+    }
+    if (!project.owner || !Number.isInteger(Number(project.number))) {
+      fail("GitHub Project owner and numeric project number are required");
+    }
+  }
+}
+
+function resolveRepoPath(value, label) {
+  if (typeof value !== "string" || value.trim() === "") {
+    fail(`${label} must be a non-empty repository-relative path`);
+  }
+  if (path.isAbsolute(value)) {
+    fail(`${label} must be repository-relative: ${value}`);
+  }
+  const target = path.resolve(repoRoot, value);
+  const relative = path.relative(repoRoot, target);
+  if (
+    relative === "" ||
+    relative.startsWith("..") ||
+    path.isAbsolute(relative)
+  ) {
+    fail(`${label} escapes repoRoot: ${value}`);
+  }
+  return target;
+}
+
+function assertRealPathWithinRepo(target, label) {
+  const realRoot = fs.realpathSync(repoRoot);
+  const realTarget = fs.realpathSync(target);
+  const relative = path.relative(realRoot, realTarget);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    fail(`${label} resolves outside repoRoot: ${target}`);
+  }
+  return realTarget;
 }
 
 function loadItems(options = {}) {
@@ -535,8 +640,12 @@ function renderLocalHtml(items) {
   const local = config.surfaces?.localHtml;
   if (!local?.enabled) return;
 
-  const outputPath = path.resolve(repoRoot, local.output || ".project-board/index.html");
+  const outputPath = resolveRepoPath(
+    local.output || ".project-board/index.html",
+    "local HTML output",
+  );
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  assertRealPathWithinRepo(path.dirname(outputPath), "local HTML output directory");
   fs.writeFileSync(outputPath, htmlDocument(items), "utf8");
   process.stdout.write(
     `Local HTML rendered (${items.length} item(s)): ${path.relative(repoRoot, outputPath)}\n`,
@@ -1409,7 +1518,10 @@ function htmlDocument(items) {
 function serveLocalHtml(initialItems) {
   const local = config.surfaces?.localHtml;
   if (!local?.enabled) fail("Local HTML surface is not enabled");
-  const outputPath = path.resolve(repoRoot, local.output || ".project-board/index.html");
+  const outputPath = resolveRepoPath(
+    local.output || ".project-board/index.html",
+    "local HTML output",
+  );
   const port = Number(local.port || 4173);
   const liveRefresh = local.liveRefresh;
   const liveRefreshEnabled =
@@ -1470,6 +1582,19 @@ function serveLocalHtml(initialItems) {
     if (requestUrl.pathname === "/favicon.ico") {
       response.writeHead(204);
       return response.end();
+    }
+    if (requestUrl.pathname === "/health") {
+      response.writeHead(200, {
+        "cache-control": "no-store",
+        "content-type": "application/json; charset=utf-8",
+      });
+      return response.end(
+        JSON.stringify({
+          adapterVersion: ADAPTER_VERSION,
+          canonicalTracker: config.canonicalTracker,
+          title: config.title || "Project Board",
+        }),
+      );
     }
     if (requestUrl.pathname === "/events") {
       response.writeHead(200, {
@@ -1609,11 +1734,16 @@ function send(response, status, body) {
 }
 
 function allowedSource(target) {
-  const roots = (config.localMarkdown?.roots || []).map((root) =>
-    path.resolve(repoRoot, root),
+  if (!fs.existsSync(target)) return false;
+  const roots = (config.localMarkdown?.roots || [".scratch"]).map((root) =>
+    assertRealPathWithinRepo(
+      resolveRepoPath(root, "Local Markdown root"),
+      "Local Markdown root",
+    ),
   );
+  const realTarget = fs.realpathSync(target);
   return roots.some((root) => {
-    const relative = path.relative(root, target);
+    const relative = path.relative(root, realTarget);
     return relative && !relative.startsWith("..") && !path.isAbsolute(relative);
   });
 }

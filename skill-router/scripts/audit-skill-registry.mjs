@@ -125,6 +125,15 @@ function main() {
       errors.push(`Skill root does not exist: ${root}`);
       continue;
     }
+    for (const forbidden of options.forbidden) {
+      const retiredPath = path.join(root, forbidden);
+      try {
+        fs.lstatSync(retiredPath);
+        errors.push(`Forbidden legacy path '${forbidden}' remains at ${retiredPath}`);
+      } catch {
+        // The retired path does not exist.
+      }
+    }
 
     for (const skillFile of findSkillFiles(root)) {
       const text = fs.readFileSync(skillFile, "utf8");
