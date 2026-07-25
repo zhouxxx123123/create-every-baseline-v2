@@ -90,6 +90,8 @@ For a GitHub surface, confirm the exact project owner and title. Verify `gh auth
 
 For local HTML, default to port `4173`; choose another free localhost port without asking only when `4173` is occupied. The server must bind to `127.0.0.1`, expose only the board and explicitly selected local Markdown source files, and never bind to a public interface.
 
+Enable live refresh by default. While `serve` is running, Local Markdown uses recursive file watching with a safe polling fallback, GitHub Issues uses a 30-second polling interval, and the browser reloads through a localhost-only server-sent event only when normalized ticket data changes. Preserve `sync` as the explicit recovery and non-server update path.
+
 Set the board interface language from the user's setup language or an existing repository convention: use `zh-CN` for a Chinese setup conversation and `en` for an English setup conversation. Record the chosen locale without adding another question unless the signals conflict. This localizes board controls, states, legends, and known ticket types; canonical titles and labels remain unchanged.
 
 The local HTML surface always provides two tabs:
@@ -140,7 +142,13 @@ Use this machine-config shape, omitting tracker-specific properties that do not 
     "localHtml": {
       "enabled": true,
       "output": ".project-board/index.html",
-      "port": 4173
+      "port": 4173,
+      "liveRefresh": {
+        "enabled": true,
+        "debounceMs": 300,
+        "githubPollMs": 30000,
+        "localPollMs": 1000
+      }
     }
   }
 }

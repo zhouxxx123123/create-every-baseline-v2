@@ -32,45 +32,46 @@ if (command === "sync") {
 } else if (command === "serve") {
   const items = loadItems();
   renderLocalHtml(items);
-  serveLocalHtml();
+  serveLocalHtml(items);
 } else {
   fail("Usage: project-board.mjs [sync|render|serve] [--config <path>]");
 }
 
-function loadItems() {
+function loadItems(options = {}) {
   let items;
   if (config.canonicalTracker === "github") {
-    items = loadGitHubIssues();
+    items = loadGitHubIssues(options);
   } else if (config.canonicalTracker === "local-markdown") {
     items = loadLocalMarkdownTickets();
   } else {
     fail(`Unsupported canonicalTracker: ${config.canonicalTracker}`);
   }
+  if (items === null) return null;
   return finalizeItems(items);
 }
 
-function loadGitHubIssues() {
+function loadGitHubIssues(options = {}) {
   const repository = config.github?.repository;
   if (!repository) {
     fail("github.repository is required for the GitHub tracker");
   }
 
-  const raw = run(
-    "gh",
-    [
-      "issue",
-      "list",
-      "--repo",
-      repository,
-      "--state",
-      "all",
-      "--limit",
-      "1000",
-      "--json",
-      "number,title,body,state,url,labels,assignees,updatedAt",
-    ],
-    { capture: true },
-  );
+  const issueArgs = [
+    "issue",
+    "list",
+    "--repo",
+    repository,
+    "--state",
+    "all",
+    "--limit",
+    "1000",
+    "--json",
+    "number,title,body,state,url,labels,assignees,updatedAt",
+  ];
+  const raw = options.allowFailure
+    ? tryRun("gh", issueArgs, { capture: true })
+    : run("gh", issueArgs, { capture: true });
+  if (raw === null) return null;
 
   const issues = JSON.parse(raw);
   const items = issues.map((issue) => {
@@ -801,7 +802,10 @@ function htmlDocument(items) {
     const viewSummary = document.querySelector("#viewSummary");
     const inspectorContent = document.querySelector("#inspectorContent");
     let selectedGroup = "";
-    let selectedKey = (items.find(item => item.isFrontier) || items[0] || {}).key || "";
+    const savedSelection = sessionStorage.getItem("project-board:selected");
+    let selectedKey = byKey.has(savedSelection)
+      ? savedSelection
+      : (items.find(item => item.isFrontier) || items[0] || {}).key || "";
     for (const value of laneOrder.filter(lane => items.some(item => item.lane === lane))) status.add(new Option(copy.lanes[value] || value, value));
 
     function visibleItems() {
@@ -822,6 +826,7 @@ function htmlDocument(items) {
 
     function selectItem(item) {
       selectedKey = item.key;
+      sessionStorage.setItem("project-board:selected", selectedKey);
       render();
     }
 
@@ -1183,6 +1188,7 @@ function htmlDocument(items) {
 
     function selectView(name) {
       const treeSelected = name === "tree";
+      sessionStorage.setItem("project-board:view", name);
       document.querySelector("#treeTab").setAttribute("aria-selected", String(treeSelected));
       document.querySelector("#flowTab").setAttribute("aria-selected", String(!treeSelected));
       treeView.hidden = !treeSelected;
@@ -1196,16 +1202,71 @@ function htmlDocument(items) {
     document.querySelector("#flowTab").addEventListener("click", () => selectView("flow"));
     initializeSidebar();
     render();
+    selectView(sessionStorage.getItem("project-board:view") === "flow" ? "flow" : "tree");
+    if (window.EventSource) {
+      const events = new EventSource("/events");
+      events.addEventListener("board-updated", () => window.location.reload());
+    }
   </script>
 </body>
 </html>`;
 }
 
-function serveLocalHtml() {
+function serveLocalHtml(initialItems) {
   const local = config.surfaces?.localHtml;
   if (!local?.enabled) fail("Local HTML surface is not enabled");
   const outputPath = path.resolve(repoRoot, local.output || ".project-board/index.html");
   const port = Number(local.port || 4173);
+  const liveRefresh = local.liveRefresh;
+  const liveRefreshEnabled =
+    liveRefresh !== false && liveRefresh?.enabled !== false;
+  const debounceMs = Math.max(50, Number(liveRefresh?.debounceMs || 300));
+  const clients = new Set();
+  let currentFingerprint = boardFingerprint(initialItems);
+  let refreshTimer = null;
+  let refreshing = false;
+  let queuedReason = null;
+
+  function notifyClients() {
+    for (const client of clients) {
+      client.write(`event: board-updated\ndata: ${Date.now()}\n\n`);
+    }
+  }
+
+  function refreshBoard(reason) {
+    if (refreshing) {
+      queuedReason = reason;
+      return;
+    }
+    refreshing = true;
+    try {
+      const items = loadItems({ allowFailure: true });
+      if (items === null) {
+        process.stderr.write(`Live refresh skipped (${reason}): tracker read failed.\n`);
+        return;
+      }
+      const nextFingerprint = boardFingerprint(items);
+      if (nextFingerprint === currentFingerprint) return;
+      renderLocalHtml(items);
+      currentFingerprint = nextFingerprint;
+      notifyClients();
+      process.stdout.write(`Project board refreshed (${reason}).\n`);
+    } catch (error) {
+      process.stderr.write(`Live refresh failed (${reason}): ${error.message}\n`);
+    } finally {
+      refreshing = false;
+      if (queuedReason) {
+        const nextReason = queuedReason;
+        queuedReason = null;
+        scheduleRefresh(nextReason);
+      }
+    }
+  }
+
+  function scheduleRefresh(reason) {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => refreshBoard(reason), debounceMs);
+  }
 
   const server = http.createServer((request, response) => {
     const requestUrl = new URL(request.url, `http://${request.headers.host}`);
@@ -1215,6 +1276,18 @@ function serveLocalHtml() {
     if (requestUrl.pathname === "/favicon.ico") {
       response.writeHead(204);
       return response.end();
+    }
+    if (requestUrl.pathname === "/events") {
+      response.writeHead(200, {
+        "cache-control": "no-cache, no-transform",
+        "connection": "keep-alive",
+        "content-type": "text/event-stream",
+        "x-accel-buffering": "no",
+      });
+      response.write("retry: 2000\n\n");
+      clients.add(response);
+      request.on("close", () => clients.delete(response));
+      return;
     }
     if (requestUrl.pathname === "/source") {
       const relative = requestUrl.searchParams.get("path") || "";
@@ -1230,7 +1303,104 @@ function serveLocalHtml() {
   server.on("error", (error) => fail(`Local board server failed: ${error.message}`));
   server.listen(port, "127.0.0.1", () => {
     process.stdout.write(`Project board: http://127.0.0.1:${port}/\n`);
+    if (liveRefreshEnabled) startLiveBoardRefresh(scheduleRefresh, liveRefresh);
   });
+
+  setInterval(() => {
+    for (const client of clients) client.write(": heartbeat\n\n");
+  }, 20_000).unref();
+}
+
+function startLiveBoardRefresh(scheduleRefresh, options = {}) {
+  if (config.canonicalTracker === "local-markdown") {
+    startLocalMarkdownWatch(scheduleRefresh, options);
+    return;
+  }
+  if (config.canonicalTracker === "github") {
+    const intervalMs = Math.max(5_000, Number(options.githubPollMs || 30_000));
+    setInterval(() => scheduleRefresh("GitHub poll"), intervalMs);
+    process.stdout.write(`Live refresh: polling GitHub every ${intervalMs}ms.\n`);
+  }
+}
+
+function startLocalMarkdownWatch(scheduleRefresh, options = {}) {
+  const roots = (config.localMarkdown?.roots || [".scratch"])
+    .map((root) => path.resolve(repoRoot, root))
+    .filter((root) => fs.existsSync(root));
+  const watchers = [];
+  let polling = false;
+
+  function startPolling(reason) {
+    if (polling) return;
+    polling = true;
+    for (const watcher of watchers.splice(0)) watcher.close();
+    const intervalMs = Math.max(500, Number(options.localPollMs || 1_000));
+    let signature = localMarkdownSignature(roots);
+    setInterval(() => {
+      const nextSignature = localMarkdownSignature(roots);
+      if (nextSignature === signature) return;
+      signature = nextSignature;
+      scheduleRefresh("Local Markdown poll");
+    }, intervalMs);
+    process.stdout.write(
+      `Live refresh: using ${intervalMs}ms Local Markdown polling (${reason}).\n`,
+    );
+  }
+
+  for (const root of roots) {
+    try {
+      const watcher = fs.watch(
+        root,
+        { recursive: true },
+        (_eventType, filename) => {
+          if (!shouldRefreshMarkdown(filename)) return;
+          scheduleRefresh("Local Markdown change");
+        },
+      );
+      watcher.on("error", (error) => startPolling(error.message));
+      watchers.push(watcher);
+    } catch (error) {
+      startPolling(error.message);
+      break;
+    }
+  }
+
+  if (watchers.length === 0 && !polling) {
+    startPolling("recursive file watching unavailable");
+  } else if (!polling) {
+    process.stdout.write(`Live refresh: watching ${watchers.length} Markdown root(s).\n`);
+  }
+}
+
+function shouldRefreshMarkdown(filename) {
+  if (!filename) return true;
+  const normalized = String(filename).replaceAll("\\", "/");
+  const segments = normalized.split("/");
+  if (segments.some((segment) => [".git", "node_modules", "reports"].includes(segment))) {
+    return false;
+  }
+  return normalized.endsWith(".md");
+}
+
+function localMarkdownSignature(roots) {
+  return roots
+    .flatMap((root) => walkMarkdown(root))
+    .sort()
+    .map((filePath) => {
+      try {
+        const stat = fs.statSync(filePath);
+        return `${filePath}:${stat.size}:${stat.mtimeMs}`;
+      } catch {
+        return `${filePath}:missing`;
+      }
+    })
+    .join("|");
+}
+
+function boardFingerprint(items) {
+  return JSON.stringify(
+    [...items].sort((a, b) => a.key.localeCompare(b.key)),
+  );
 }
 
 function sendFile(response, filePath, contentType) {

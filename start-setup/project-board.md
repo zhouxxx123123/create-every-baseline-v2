@@ -10,6 +10,7 @@
 - Machine config: `.project-board/config.json`
 - Sync command: `node .project-board/project-board.mjs sync`
 - Serve command: `node .project-board/project-board.mjs serve`
+- Live refresh: `Local Markdown watch | GitHub polling | Disabled`
 - Last verified: `<date and result>`
 
 ## Authority
@@ -25,6 +26,8 @@
 ## Refresh Rules
 
 - Run the sync command after a successful canonical tracker write that creates an item or changes state, labels, assignment, blocking, or closure.
+- While the serve command is running, Local Markdown changes are watched and GitHub Issues are polled. The browser reloads only when canonical item data actually changes.
+- Live refresh is a convenience, not a replacement for the sync command. Keep the explicit command as the recovery path and for updates made while the local server is stopped.
 - A projection refresh failure does not roll back a successful canonical write. Report the stale surface and exact recovery command.
 - Never report the GitHub Project or local HTML surface as synchronized unless its latest refresh succeeded.
 - The local server binds to `127.0.0.1` by default and must not expose repository content on a public interface.
