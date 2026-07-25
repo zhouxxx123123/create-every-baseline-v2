@@ -9,6 +9,8 @@ Translate an approved plan, specification, or conversation into a set of **ticke
 
 The issue tracker and triage label vocabulary should have been provided to you — run `/start-setup` if not.
 
+If `docs/agents/project-board.md` exists, publish only to the canonical tracker, then run its configured board sync command after successful tracker readback. GitHub Project and local HTML are projections, not additional ticket stores. Report a projection failure without rolling back or duplicating the canonical tickets.
+
 ## Responsibility boundary
 
 Only translate approved source material into executable vertical tickets and publish those tickets. Do not perform Product Readiness, make new product decisions, modify the source specification, design prototypes, invent architecture, run implementation prechecks, implement production code, review code, or perform release acceptance.

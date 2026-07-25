@@ -14,6 +14,10 @@ Issues and PRDs for this repo live as GitLab issues. Use the [`glab`](https://gi
 
 Infer the repo from `git remote -v` — `glab` does this automatically when run inside a clone.
 
+## Project board projection
+
+If `docs/agents/project-board.md` exists, the issue remains canonical. After a successful issue create or a change to state, labels, assignment, blocking, or closure, run the configured board sync command. The bundled board adapter does not project GitLab; use a separately confirmed GitLab adapter or configure no board. A refresh failure does not undo the issue write.
+
 ## Merge requests as a triage surface
 
 **MRs as a request surface: no.** _(Set to `yes` if this repo treats external merge requests as feature requests; `/triage` reads this flag.)_

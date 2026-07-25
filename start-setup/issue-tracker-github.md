@@ -13,6 +13,10 @@ Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all op
 
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
 
+## Project board projection
+
+If `docs/agents/project-board.md` exists, the issue remains canonical. After a successful issue create or a change to state, labels, assignment, blocking, or closure, run the configured board sync command. A board refresh failure does not undo the issue write; report the stale surface and recovery command.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_

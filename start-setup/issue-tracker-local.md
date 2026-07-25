@@ -10,6 +10,10 @@ Issues and specs (you may know a spec as a PRD) for this repo live as markdown f
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
 
+## Project board projection
+
+If `docs/agents/project-board.md` exists, the Markdown ticket remains canonical. After a successful ticket write that changes status, assignment, blocking, or closure, run the configured board sync command. GitHub Project projection is not compatible with Local Markdown because draft-item mirroring would create a second ticket identity; use the local HTML surface. A refresh failure does not undo the canonical file write.
+
 ## When a skill says "publish to the issue tracker"
 
 Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).

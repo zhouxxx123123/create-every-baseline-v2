@@ -1,6 +1,6 @@
 interface:
   display_name: "Start Setup"
-  short_description: "Choose Git storage and configure repo workflows"
-  default_prompt: "Use $start-setup to choose local-only or GitHub-backed Git and configure this repository's workflow skills."
+  short_description: "Choose Git, tracker, and project board"
+  default_prompt: "Use $start-setup to choose local-only or GitHub-backed Git, configure the issue tracker, and optionally create synchronized GitHub Project and local HTML board surfaces."
 policy:
   allow_implicit_invocation: false

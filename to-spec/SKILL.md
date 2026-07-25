@@ -7,6 +7,8 @@ This skill takes the current conversation context and codebase understanding and
 
 The issue tracker and triage label vocabulary should have been provided to you — run `/start-setup` if not.
 
+If `docs/agents/project-board.md` exists, publish the specification only to the canonical tracker, then run the configured board sync command after successful tracker readback. Do not create a second specification item solely for a board. A projection failure leaves the canonical publication intact and must be reported with its recovery command.
+
 ## Process
 
 Before writing, locate the persisted `READY_FOR_TO_SPEC` receipt from `product-readiness` through the originating work item, repository-declared workflow-evidence location, or `.scratch/product-readiness/`. Verify that its target and specification boundary match this request and that every recorded canonical-source, prototype, artifact, fixture, admitted-ID, and composition identity is still current. For a machine-verifiable receipt, run `node "<resolved-product-readiness-skill-dir>/scripts/readiness-receipt.mjs" verify <receipt.md>` and stop on any failure. A historical receipt without the machine identity block cannot be proven current by that script; return to Product Readiness for a fresh receipt instead of rewriting it. If the receipt is absent, stale, mismatched, or predates a material source change, stop and route back to Product Readiness. Do not reopen unchanged product decisions, and do not treat receipt text as a product requirement. `to-spec` does not grant itself readiness.

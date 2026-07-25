@@ -74,7 +74,7 @@ Off the main flow entirely.
 
 ## Precondition
 
-**`/start-setup`** — run before your first engineering flow to configure the issue tracker, triage labels, and doc layout the other skills assume. Custom issue trackers also work.
+**`/start-setup`** — run before your first engineering flow to choose local-only or GitHub-backed Git, configure the issue tracker, optionally create GitHub Project and local HTML board projections, and record triage and domain conventions. Custom issue trackers also work.
 
 ## Maintain the skill registry
 

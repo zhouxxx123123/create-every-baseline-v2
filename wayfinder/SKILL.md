@@ -23,6 +23,8 @@ The map is an **index**, not a store. It lists the decisions made and points at 
 
 **Where the map, its child tickets, blocking, and frontier queries physically live is tracker-specific.** The issue tracker should have been provided to you — run `/start-setup` if not. Consult the tracker doc's "Wayfinding operations" section for how _this_ repo expresses them. If no tracker has been provided, default to the local-markdown tracker.
 
+If `docs/agents/project-board.md` exists, the tracker remains canonical. After a successful map or ticket write that changes creation, claim, blocking, status, or closure, run the configured board sync command. Never read a board-only field as product or routing authority. A projection failure does not undo the canonical write; report the stale surface and recovery command.
+
 ### The map body
 
 The whole map at low resolution, loaded once per session. Open tickets are **not** listed — they are open child issues, found by query.
