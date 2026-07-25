@@ -1,5 +1,6 @@
 # Project Board
 
+- Setup workflow: `FULL_SETUP | UPDATE_BOARD`
 - Mode: `NONE | LOCAL_HTML | GITHUB_PROJECT | DUAL`
 - Canonical state: `ISSUE_TRACKER`
 - Interface language: `zh-CN | en`
@@ -15,6 +16,7 @@
 
 ## Authority
 
+- `UPDATE_BOARD` changes only this projection setup; it preserves the existing Git destination, canonical tracker, Wayfinder Maps, tickets, domain rules, and prototype identity.
 - The configured issue tracker owns ticket content and workflow state.
 - GitHub Project and local HTML are projections of that same canonical state.
 - Do not create board-only decisions, blockers, or lifecycle states.

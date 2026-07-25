@@ -1,6 +1,6 @@
 ---
 name: start-setup
-description: Configure a repo for the engineering skills by choosing local-only or GitHub-backed Git, setting up its issue tracker and optional GitHub Project plus local HTML board, then recording triage and domain conventions. Run once before first use of the other engineering skills.
+description: Configure a repo for the engineering skills by choosing local-only or GitHub-backed Git, setting up its issue tracker and optional GitHub Project plus local HTML board, then recording triage and domain conventions. Also use update-board mode to add, repair, or upgrade board projections in an existing configured project without rerunning full setup.
 ---
 
 # Start Setup
@@ -15,7 +15,30 @@ Scaffold the per-repo configuration that the engineering skills assume:
 
 This is a prompt-driven skill, not a deterministic script. Explore, present what you found, confirm with the user, then write.
 
-## Process
+## Modes
+
+- **Full setup (`FULL_SETUP`)** — the default for a new or unconfigured repository. Follow the complete process below.
+- **Update board (`UPDATE_BOARD`)** — use when the user explicitly says `update-board`, asks to update or repair an existing project's board, or wants to add the current board to a previously configured project. Follow the focused workflow below and do not rerun the other setup sections.
+
+### Update board workflow
+
+Treat this as an in-place projection migration, not a new project setup.
+
+1. Record `git status --short` and inspect the existing setup authority:
+   - `AGENTS.md` or `CLAUDE.md`;
+   - `docs/agents/git.md`, `docs/agents/issue-tracker.md`, and `docs/agents/project-board.md`;
+   - `.project-board/config.json`, `.project-board/project-board.mjs`, and `.gitignore`;
+   - existing `.scratch/*/map.md`, canonical tickets, real specifications, and implementation issues only to verify projection compatibility.
+2. Determine the canonical tracker from the existing authority files. Do not infer it from the board, reopen settled Git/tracker/triage/domain choices, or modify Map and ticket content. If tracker authority is missing or contradictory, stop and report that blocker instead of guessing.
+3. Preserve the existing board mode, GitHub Project identity, title, locale, port, tracker roots, and unknown config fields unless the user explicitly asks to change them. If no board exists, ask only which Section C board surface to add; recommend from the already configured Git destination and tracker.
+4. Show the exact board-only migration scope before editing. Limit changes to the `### Project board` setup reference when needed, `docs/agents/project-board.md`, `.project-board/config.json`, `.project-board/project-board.mjs`, and the generated-output ignore rule. Preserve unrelated working-tree changes.
+5. Apply the current Section C authority, hierarchy, localization, and live-refresh rules. Existing Map files remain navigation authority. Never create, copy, renumber, or rewrite Map, decision, research, prototype, specification, or implementation artifacts merely to make the board render.
+6. Run `node .project-board/project-board.mjs sync`. For local HTML, start `serve`, request the configured localhost URL, verify Tree and Flow, then stop the verification server. For a GitHub surface, verify its canonical issue projection without creating draft copies.
+7. Report the preserved authority, changed board files, rendered node counts, detected Active frontier, verification result, and exact recovery command. Do not stage, commit, push, or describe a projection as current unless those actions actually succeeded.
+
+`UPDATE_BOARD` is a setup workflow mode. It is not a replacement for the generated adapter's `sync`, `render`, or `serve` runtime commands.
+
+## Full Setup Process
 
 ### 1. Explore
 
