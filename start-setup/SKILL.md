@@ -1,12 +1,13 @@
 ---
 name: start-setup
-description: Configure this repo for the engineering skills — set up its issue tracker, triage label vocabulary, and domain doc layout. Run once before first use of the other engineering skills.
+description: Configure a repo for the engineering skills by choosing local-only or GitHub-backed Git, then setting up its issue tracker, triage label vocabulary, and domain doc layout. Run once before first use of the other engineering skills.
 ---
 
 # Start Setup
 
 Scaffold the per-repo configuration that the engineering skills assume:
 
+- **Git destination** — whether history remains local-only or is backed by GitHub
 - **Issue tracker** — where issues live (GitHub by default; local markdown is also supported out of the box)
 - **Triage labels** — the strings used for the five canonical triage roles, plus the repository's ready-label semantics
 - **Domain docs** — where `CONTEXT.md`, product baselines, prototype evidence, and ADRs live, and the consumer rules for reading them
@@ -20,6 +21,7 @@ This is a prompt-driven skill, not a deterministic script. Explore, present what
 Look at the current repo to understand its starting state. Read whatever exists; don't assume:
 
 - `git remote -v` and `.git/config` — is this a GitHub repo? Which one?
+- `git status --short`, the current branch, tracked-file count, ignored files, unexpectedly large files, and obvious secret-bearing paths — can setup safely establish or connect history without sweeping unrelated material into a baseline?
 - `AGENTS.md` and `CLAUDE.md` at the repo root — does either exist? Is there already an `## Agent skills` section in either?
 - `CONTEXT.md` and `CONTEXT-MAP.md` at the repo root
 - `docs/adr/` and any `src/*/docs/adr/` directories
@@ -27,16 +29,36 @@ Look at the current repo to understand its starting state. Read whatever exists;
 - any existing prototype identity and version-number convention, including the scope in which IDs are unique and how full references are written
 - `docs/agents/` — does this skill's prior output already exist?
 - `.scratch/` — sign that a local-markdown issue tracker convention is already in use
-- Is the `triage` skill installed? (a `triage` skill folder alongside this one, or `triage` in your available skills.) This decides whether Section B runs at all.
+- Is the `triage` skill installed? (a `triage` skill folder alongside this one, or `triage` in your available skills.) This decides whether Section C runs at all.
 - Monorepo signals — a `pnpm-workspace.yaml`, a `workspaces` field in `package.json`, or a populated `packages/*` with its own `src/`. Present only in a genuinely large multi-package repo; their absence means single-context, which is almost every repo.
 
 ### 2. Present findings and ask
 
 Summarise what's present and what's missing. Then take the sections in order — one section, one answer, then the next.
 
-Lead each section with the recommended answer so the user can accept it in a word. Give a one-line explainer only when the choice genuinely branches; skip the section entirely when exploration already settled it (Section B when `triage` isn't installed, Section C when there's no monorepo).
+Lead each section with the recommended answer so the user can accept it in a word. Give a one-line explainer only when the choice genuinely branches; skip the section entirely when exploration already settled it (Section C when `triage` isn't installed, Section D when there's no monorepo).
 
-**Section A — Issue tracker.**
+**Section A — Git destination.**
+
+> Explainer: This controls where Git history is stored. It is independent from the issue tracker: a repo may use local-only Git with Local Markdown issues, local-only Git with another tracker, or GitHub-backed Git with either GitHub Issues or Local Markdown issues.
+
+Always ask this section, even when a remote already exists. Recommend the detected current state, but do not silently preserve, add, replace, or remove a remote.
+
+- **Local only (`LOCAL_ONLY`)** — initialize Git locally when needed; do not create a remote, push, or publish the repository.
+- **GitHub (`GITHUB`)** — use an existing GitHub remote or create/connect a GitHub repository after confirming the exact owner, repository name, and visibility. Recommend `private` for a new repository unless the user explicitly requests public visibility.
+
+Record the choice in `docs/agents/git.md`. For `LOCAL_ONLY`, record `Remote: None` and never call a hosting API. For `GITHUB`, verify `gh auth status`, record the canonical remote URL and default branch, and stop for authentication rather than substituting another account.
+
+Before an initial commit or first push:
+
+1. inspect status, ignored files, large files, and obvious secret-bearing paths;
+2. show the exact proposed file scope;
+3. exclude generated, secret, unrelated, or user-owned work that was not approved;
+4. ask for explicit confirmation of the initial commit and, separately, the first push.
+
+Choosing `GITHUB` authorizes setup of the destination after the repository identity is confirmed; it does not authorize publishing a dirty worktree, changing visibility, force-pushing, or rewriting history. Choosing `LOCAL_ONLY` does not prevent the user from adding GitHub later by rerunning setup repair.
+
+**Section B — Issue tracker.**
 
 > Explainer: The "issue tracker" is where issues live for this repo. Skills like `to-tickets`, `triage`, `to-spec`, and `qa` read from and write to it — they need to know whether to call `gh issue create`, write a markdown file under `.scratch/`, or follow some other workflow you describe. Pick the place you actually track work for this repo.
 
@@ -49,7 +71,7 @@ Default posture: these skills were designed for GitHub. If a `git remote` points
 
 Record the choice in `docs/agents/issue-tracker.md`. The GitHub and GitLab templates carry a "PRs as a request surface" flag, defaulted **off** — leave it off and don't raise it; a user who wants external PRs in the triage queue can flip the flag in the file later.
 
-**Section B — Triage label vocabulary.** Skip this section entirely if the `triage` skill isn't installed (exploration told you) — an uninstalled skill needs no labels.
+**Section C — Triage label vocabulary.** Skip this section entirely if the `triage` skill isn't installed (exploration told you) — an uninstalled skill needs no labels.
 
 If it is installed, ask exactly one question:
 
@@ -64,7 +86,7 @@ Record one repository-level ready semantics value in `docs/agents/triage-labels.
 
 Preserve an existing explicit value when it is one of these two values. If the field is missing, write `FRONTIER_ONLY`. Never infer ready semantics from labels already present on tracker items. If an explicit value is unsupported or contradictory, report a setup-repair blocker instead of silently replacing it.
 
-**Section C — Domain docs.** Default to **single-context** — one `CONTEXT.md` + `docs/adr/` at the repo root. This fits almost every repo; write it without asking.
+**Section D — Domain docs.** Default to **single-context** — one `CONTEXT.md` + `docs/adr/` at the repo root. This fits almost every repo; write it without asking.
 
 Offer **multi-context** — a root `CONTEXT-MAP.md` pointing to per-context `CONTEXT.md` files — only when exploration found monorepo signals. Then confirm which layout they want.
 
@@ -81,7 +103,7 @@ Prototype numbering is workflow configuration, not a product choice, so do not a
 Show the user a draft of:
 
 - The `## Agent skills` block to add to whichever of `CLAUDE.md` / `AGENTS.md` is being edited (see step 4 for selection rules)
-- The contents of `docs/agents/issue-tracker.md`, `docs/agents/domain.md`, and `docs/agents/triage-labels.md` (the last only when `triage` is installed)
+- The contents of `docs/agents/git.md`, `docs/agents/issue-tracker.md`, `docs/agents/domain.md`, and `docs/agents/triage-labels.md` (the last only when `triage` is installed)
 
 Let them edit before writing. Keep `docs/agents/triage-labels.md` concise: the five-role mapping, the configured ready semantics value, and one sentence explaining it. Detailed readiness, publication, readback, and frontier rules remain owned by the currently invoked workflow skill.
 
@@ -106,6 +128,10 @@ The block:
 
 Workflow rules belong to the skill that defines the workflow. Re-read the relevant invoked skill and apply it as the workflow authority instead of copying, rewriting, or renegotiating its rules as project decisions.
 
+### Git repository
+
+[one-line summary of local-only or GitHub-backed history]. See `docs/agents/git.md`.
+
 ### Issue tracker
 
 [one-line summary of where issues are tracked]. See `docs/agents/issue-tracker.md`.
@@ -119,10 +145,11 @@ Workflow rules belong to the skill that defines the workflow. Re-read the releva
 [one-line summary of layout — "single-context" or "multi-context"]. See `docs/agents/domain.md`.
 ```
 
-Include the `### Triage labels` sub-block, and write `docs/agents/triage-labels.md`, only when `triage` is installed and Section B ran. When it isn't, both are omitted.
+Include the `### Triage labels` sub-block, and write `docs/agents/triage-labels.md`, only when `triage` is installed and Section C ran. When it isn't, both are omitted.
 
 Then write the docs files using the seed templates in this skill folder as a starting point. Preserve any existing product-baseline and prototype-traceability conventions instead of reducing the repo back to glossary-and-ADR-only documentation. Ensure `docs/agents/domain.md` records the effective prototype identity convention, whether preserved from the repository or established from the default:
 
+- [git.md](./git.md) — local-only or GitHub-backed Git configuration
 - [issue-tracker-github.md](./issue-tracker-github.md) — GitHub issue tracker
 - [issue-tracker-gitlab.md](./issue-tracker-gitlab.md) — GitLab issue tracker
 - [issue-tracker-local.md](./issue-tracker-local.md) — local-markdown issue tracker
@@ -131,8 +158,8 @@ Then write the docs files using the seed templates in this skill folder as a sta
 
 For "other" issue trackers, write `docs/agents/issue-tracker.md` from scratch using the user's description.
 
-When repairing an existing setup, preserve already settled issue-tracker, label-name, domain-doc, workflow-authority, and prototype-identity choices. If ready semantics alone is missing, add the default `FRONTIER_ONLY` value and its one-sentence meaning without reopening those choices. Do not run tracker queries or inspect current labels to infer the missing value.
+When repairing an existing setup, preserve already settled Git destination, issue-tracker, label-name, domain-doc, workflow-authority, and prototype-identity choices unless the user explicitly asks to change one. If ready semantics alone is missing, add the default `FRONTIER_ONLY` value and its one-sentence meaning without reopening those choices. Do not run tracker queries or inspect current labels to infer the missing value.
 
 ### 5. Done
 
-Tell the user the setup is complete and which engineering skills will now read from these files. Mention they can edit `docs/agents/*.md` directly later — re-running this skill is only necessary if they want to switch issue trackers or restart from scratch.
+Tell the user the setup is complete and which engineering skills will now read from these files. Report whether Git is local-only or GitHub-backed, but do not call a local-only setup "published" or a GitHub setup "synced" unless the corresponding push actually succeeded. Mention they can edit `docs/agents/*.md` directly later — re-running this skill is only necessary if they want to change the Git destination, switch issue trackers, or restart from scratch.
