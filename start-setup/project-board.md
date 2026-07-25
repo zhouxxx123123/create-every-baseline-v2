@@ -9,6 +9,7 @@
 - Local URL: `http://127.0.0.1:<port>/`
 - Local views: `Tree | Flow`
 - Machine config: `.project-board/config.json`
+- Quick open command: `board`
 - Sync command: `node .project-board/project-board.mjs sync`
 - Serve command: `node .project-board/project-board.mjs serve`
 - Live refresh: `Local Markdown watch | GitHub polling | Disabled`

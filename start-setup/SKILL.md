@@ -34,7 +34,8 @@ Treat this as an in-place projection migration, not a new project setup.
 4. Show the exact board-only migration scope before editing. Limit changes to the `### Project board` setup reference when needed, `docs/agents/project-board.md`, `.project-board/config.json`, `.project-board/project-board.mjs`, and the generated-output ignore rule. Preserve unrelated working-tree changes.
 5. Apply the current Section C authority, hierarchy, localization, and live-refresh rules. Existing Map files remain navigation authority. Never create, copy, renumber, or rewrite Map, decision, research, prototype, specification, or implementation artifacts merely to make the board render.
 6. Run `node .project-board/project-board.mjs sync`. For local HTML, start `serve`, request the configured localhost URL, verify Tree and Flow, then stop the verification server. For a GitHub surface, verify its canonical issue projection without creating draft copies.
-7. Report the preserved authority, changed board files, rendered node counts, detected Active frontier, verification result, and exact recovery command. Do not stage, commit, push, or describe a projection as current unless those actions actually succeeded.
+7. When the user has installed the bundled [board launcher](./scripts/board) on `PATH`, verify that running `board` from the project or a nested directory opens this local surface. The launcher is a convenience only; the project-local adapter remains the portable recovery path.
+8. Report the preserved authority, changed board files, rendered node counts, detected Active frontier, verification result, and exact recovery command. Do not stage, commit, push, or describe a projection as current unless those actions actually succeeded.
 
 `UPDATE_BOARD` is a setup workflow mode. It is not a replacement for the generated adapter's `sync`, `render`, or `serve` runtime commands.
 
@@ -114,6 +115,8 @@ For a GitHub surface, confirm the exact project owner and title. Verify `gh auth
 For local HTML, default to port `4173`; choose another free localhost port without asking only when `4173` is occupied. The server must bind to `127.0.0.1`, expose only the board and explicitly selected local Markdown source files, and never bind to a public interface.
 
 Enable live refresh by default. While `serve` is running, Local Markdown uses recursive file watching with a safe polling fallback, GitHub Issues uses a 30-second polling interval, and the browser reloads through a localhost-only server-sent event only when normalized ticket data changes. Preserve `sync` as the explicit recovery and non-server update path.
+
+The optional machine-level [board launcher](./scripts/board) provides the short command `board [project-path]`. It locates the nearest configured project, reads its local port, reuses an existing board server when possible, or starts `serve` and opens the browser. Do not treat this convenience command as repository authority or require it for another collaborator to use the project.
 
 Set the board interface language from the user's setup language or an existing repository convention: use `zh-CN` for a Chinese setup conversation and `en` for an English setup conversation. Record the chosen locale without adding another question unless the signals conflict. This localizes board controls, states, legends, and known ticket types; canonical titles and labels remain unchanged.
 
@@ -270,6 +273,7 @@ Then write the docs files using the seed templates in this skill folder as a sta
 - [issue-tracker-gitlab.md](./issue-tracker-gitlab.md) — GitLab issue tracker
 - [issue-tracker-local.md](./issue-tracker-local.md) — local-markdown issue tracker
 - [project-board.md](./project-board.md) — board authority, surfaces, and refresh rules
+- [scripts/board](./scripts/board) — optional one-word local launcher installed on the user's `PATH`
 - [scripts/project-board.mjs](./scripts/project-board.mjs) — dependency-free GitHub Project sync and local HTML renderer/server
 - [triage-labels.md](./triage-labels.md) — label mapping (only if `triage` is installed)
 - [domain.md](./domain.md) — domain doc consumer rules + layout

@@ -561,6 +561,7 @@ function htmlDocument(items) {
 <html lang="${locale}">
 <head>
   <meta charset="utf-8">
+  <meta name="generator" content="start-setup-project-board">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
   <style>

@@ -1,0 +1,89 @@
+#!/bin/sh
+
+set -eu
+
+cursor=${1:-"$PWD"}
+if [ ! -d "$cursor" ]; then
+  printf 'board: project path is not a directory: %s\n' "$cursor" >&2
+  exit 1
+fi
+cursor=$(cd "$cursor" && pwd -P)
+
+while [ ! -f "$cursor/.project-board/config.json" ]; do
+  parent=$(dirname "$cursor")
+  if [ "$parent" = "$cursor" ]; then
+    printf 'board: no .project-board/config.json found; run $start-setup in update-board mode first.\n' >&2
+    exit 1
+  fi
+  cursor=$parent
+done
+
+config="$cursor/.project-board/config.json"
+adapter="$cursor/.project-board/project-board.mjs"
+if [ ! -f "$adapter" ]; then
+  printf 'board: adapter not found: %s\n' "$adapter" >&2
+  exit 1
+fi
+
+local_port=$(
+  node -e '
+    const fs = require("node:fs");
+    const config = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const local = config.surfaces?.localHtml;
+    process.stdout.write(local?.enabled ? String(local.port || 4173) : "DISABLED");
+  ' "$config"
+)
+if [ "$local_port" = "DISABLED" ]; then
+  printf 'board: the local HTML surface is not enabled for this project.\n' >&2
+  exit 1
+fi
+
+url="http://127.0.0.1:$local_port/"
+if page=$(curl -fsS --max-time 1 "$url" 2>/dev/null); then
+  case "$page" in
+    *'id="treeView"'*'id="flowView"'*)
+      open "$url"
+      printf 'Project board already running: %s\n' "$url"
+      exit 0
+      ;;
+    *)
+      printf 'board: port %s is occupied by another local service.\n' "$local_port" >&2
+      exit 1
+      ;;
+  esac
+fi
+
+cd "$cursor"
+node "$adapter" serve &
+server_pid=$!
+
+cleanup() {
+  kill "$server_pid" 2>/dev/null || true
+  wait "$server_pid" 2>/dev/null || true
+}
+trap cleanup EXIT HUP INT TERM
+
+attempt=0
+while [ "$attempt" -lt 50 ]; do
+  if ! kill -0 "$server_pid" 2>/dev/null; then
+    wait "$server_pid"
+    exit $?
+  fi
+  if page=$(curl -fsS --max-time 1 "$url" 2>/dev/null); then
+    case "$page" in
+      *'id="treeView"'*'id="flowView"'*) break ;;
+    esac
+  fi
+  attempt=$((attempt + 1))
+  sleep 0.1
+done
+
+if [ "$attempt" -ge 50 ]; then
+  printf 'board: local board did not become ready at %s\n' "$url" >&2
+  exit 1
+fi
+
+open "$url"
+printf 'Project board running: %s\nPress Ctrl+C to stop.\n' "$url"
+wait "$server_pid"
+trap - EXIT HUP INT TERM
