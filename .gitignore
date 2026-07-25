@@ -1,3 +1,5 @@
 .backup/
 .incoming/
 .DS_Store
+__pycache__/
+*.pyc
