@@ -1,0 +1,5 @@
+interface:
+  display_name: "Diagnose"
+  short_description: "Diagnose bugs with a disciplined feedback loop"
+policy:
+  allow_implicit_invocation: false
