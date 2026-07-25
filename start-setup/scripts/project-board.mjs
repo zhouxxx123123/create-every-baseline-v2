@@ -201,51 +201,90 @@ function loadLocalMarkdownTickets() {
   const roots = config.localMarkdown?.roots || [".scratch"];
   const files = roots.flatMap((root) => walkMarkdown(path.resolve(repoRoot, root)));
   const tickets = files
-    .map(readLocalTicket)
+    .map(readLocalArtifact)
     .filter(Boolean);
   const byDirectoryAndNumber = new Map();
+  const byAbsolutePath = new Map(
+    tickets.map((ticket) => [path.normalize(ticket.absolutePath), ticket]),
+  );
+  const mapsByEffortRoot = new Map();
+  const specsByEffortRoot = new Map();
 
   for (const ticket of tickets) {
     const number = ticket.fileNumber;
     if (number) {
       byDirectoryAndNumber.set(`${path.dirname(ticket.absolutePath)}:${number}`, ticket);
     }
+    if (ticket.stage === "specification") {
+      specsByEffortRoot.set(ticket.effortRoot, ticket);
+    }
+    if (!mapsByEffortRoot.has(ticket.effortRoot)) {
+      const mapPath = path.join(ticket.effortRoot, "map.md");
+      if (fs.existsSync(mapPath)) {
+        mapsByEffortRoot.set(ticket.effortRoot, readEffortMap(mapPath));
+      }
+    }
   }
 
   for (const ticket of tickets) {
-    if (ticket.lane === "Done" || ticket.blockerNumbers.length === 0) continue;
-    const unresolved = ticket.blockerNumbers.some((number) => {
-      const blocker = byDirectoryAndNumber.get(
-        `${path.dirname(ticket.absolutePath)}:${number}`,
-      );
-      return !blocker || blocker.lane !== "Done";
-    });
+    if (
+      ticket.lane === "Done" ||
+      (ticket.blockerNumbers.length === 0 && ticket.blockerPaths.length === 0)
+    ) {
+      continue;
+    }
+    const blockers = [
+      ...ticket.blockerNumbers.map((number) =>
+        byDirectoryAndNumber.get(`${path.dirname(ticket.absolutePath)}:${number}`),
+      ),
+      ...ticket.blockerPaths.map((target) => byAbsolutePath.get(target)),
+    ];
+    const unresolved = blockers.some((blocker) => !blocker || blocker.lane !== "Done");
     if (unresolved) ticket.lane = "Blocked";
   }
 
   return tickets.map((ticket) => {
-    const blockedBy = ticket.blockerNumbers
-      .map((number) =>
+    const blockedBy = [
+      ...ticket.blockerNumbers.map((number) =>
         byDirectoryAndNumber.get(`${path.dirname(ticket.absolutePath)}:${number}`),
-      )
+      ),
+      ...ticket.blockerPaths.map((target) => byAbsolutePath.get(target)),
+    ]
       .filter(Boolean)
       .map((blocker) => blocker.key);
-    const parent = ticket.parentNumber
-      ? byDirectoryAndNumber.get(
-          `${path.dirname(ticket.absolutePath)}:${ticket.parentNumber}`,
-        )
-      : null;
+    const explicitParent =
+      (ticket.parentPath ? byAbsolutePath.get(ticket.parentPath) : null) ||
+      (ticket.parentNumber
+        ? byDirectoryAndNumber.get(
+            `${path.dirname(ticket.absolutePath)}:${ticket.parentNumber}`,
+          )
+        : null);
+    const structuralParent =
+      ticket.stage === "implementation"
+        ? specsByEffortRoot.get(ticket.effortRoot)
+        : null;
+    const parent = explicitParent || structuralParent;
+    const effortMap = mapsByEffortRoot.get(ticket.effortRoot);
     const {
       absolutePath,
       blockerNumbers,
+      blockerPaths,
+      effortRoot,
       fileNumber,
       parentNumber,
+      parentPath,
       ...cleanTicket
     } = ticket;
     return {
       ...cleanTicket,
+      groupTitle: effortMap?.title || cleanTicket.group,
+      groupUrl: effortMap?.url || null,
+      hasMapAuthority: Boolean(effortMap),
       parentId: parent?.key || null,
-      blockedBy,
+      blockedBy: [...new Set(blockedBy)],
+      isDeclaredFrontier:
+        Boolean(effortMap?.frontierPath) &&
+        path.normalize(effortMap.frontierPath) === path.normalize(absolutePath),
     };
   });
 }
@@ -268,39 +307,74 @@ function walkMarkdown(root) {
   return output;
 }
 
-function readLocalTicket(absolutePath) {
+function readLocalArtifact(absolutePath) {
   const body = fs.readFileSync(absolutePath, "utf8");
+  const basename = path.basename(absolutePath);
+  if (basename === "map.md") return null;
   const status = metadata(body, "Status");
-  if (!status) return null;
+  const isSpecification = basename === "spec.md";
+  if (!status && !isSpecification) return null;
 
   const relativePath = path.relative(repoRoot, absolutePath);
   const title = body.match(/^#\s+(.+)$/m)?.[1]?.trim() || path.basename(absolutePath, ".md");
-  const type = metadata(body, "Type") || "ticket";
+  const pathSegments = relativePath.split(path.sep);
+  const stage = isSpecification
+    ? "specification"
+    : pathSegments.includes("issues")
+      ? "implementation"
+      : "product";
+  const type =
+    metadata(body, "Type") ||
+    (stage === "specification"
+      ? "spec"
+      : stage === "implementation"
+        ? "implementation"
+        : "ticket");
   const blockers = metadata(body, "Blocked by") || "";
   const parent = metadata(body, "Parent") || metadata(body, "Part of") || "";
-  const blockerNumbers = [...blockers.matchAll(/\b(\d{1,4})\b/g)].map(
+  const blockerText = blockers.replace(/\[[^\]]*\]\([^)]+\)/g, "");
+  const parentText = parent.replace(/\[[^\]]*\]\([^)]+\)/g, "");
+  const blockerNumbers = [...blockerText.matchAll(/\b(\d{1,4})\b/g)].map(
     (match) => String(Number(match[1])),
   );
+  const blockerPaths = markdownFileLinks(blockers).map((target) =>
+    resolveMarkdownTarget(absolutePath, target),
+  );
   const fileNumber = path.basename(absolutePath).match(/^(\d{1,4})[-_]/)?.[1];
-  const parentNumber = parent.match(/\b(\d{1,4})\b/)?.[1];
-  const pathSegments = relativePath.split(path.sep);
+  const parentNumber = parentText.match(/\b(\d{1,4})\b/)?.[1];
+  const parentPath = markdownFileLinks(parent)[0]
+    ? resolveMarkdownTarget(absolutePath, markdownFileLinks(parent)[0])
+    : null;
   const scratchIndex = pathSegments.indexOf(".scratch");
   const group =
     scratchIndex >= 0 && pathSegments[scratchIndex + 1]
       ? pathSegments[scratchIndex + 1]
       : path.dirname(relativePath);
+  const effortRoot =
+    scratchIndex >= 0 && pathSegments[scratchIndex + 1]
+      ? path.resolve(repoRoot, ...pathSegments.slice(0, scratchIndex + 2))
+      : path.dirname(absolutePath);
+  const lane = status ? localLane(status) : "Artifact";
 
   return {
     absolutePath,
     blockerNumbers,
+    blockerPaths,
+    effortRoot,
     fileNumber: fileNumber ? String(Number(fileNumber)) : null,
     parentNumber: parentNumber ? String(Number(parentNumber)) : null,
+    parentPath,
     key: `local:${relativePath}`,
-    id: fileNumber ? fileNumber.padStart(2, "0") : relativePath,
+    id: isSpecification
+      ? "SPEC"
+      : fileNumber
+        ? fileNumber.padStart(2, "0")
+        : relativePath,
     title,
     type,
-    state: status.toLowerCase(),
-    lane: localLane(status),
+    stage,
+    state: status ? status.toLowerCase() : "published",
+    lane,
     labels: [],
     assignees: [],
     updatedAt: fs.statSync(absolutePath).mtime.toISOString(),
@@ -309,27 +383,68 @@ function readLocalTicket(absolutePath) {
     source: "Local Markdown",
     group,
     parentId: null,
+    participatesInFrontier: Boolean(status),
   };
+}
+
+function readEffortMap(absolutePath) {
+  const body = fs.readFileSync(absolutePath, "utf8");
+  const relativePath = path.relative(repoRoot, absolutePath);
+  const title =
+    body.match(/^#\s+(.+)$/m)?.[1]?.trim() ||
+    path.basename(path.dirname(absolutePath));
+  const activeSection = body.match(
+    /^## Active frontier\s*$([\s\S]*?)(?=^##\s|(?![\s\S]))/m,
+  )?.[1];
+  const frontierTarget = activeSection
+    ? markdownFileLinks(activeSection)[0]
+    : null;
+  return {
+    title,
+    url: `/source?path=${encodeURIComponent(relativePath)}`,
+    frontierPath: frontierTarget
+      ? resolveMarkdownTarget(absolutePath, frontierTarget)
+      : null,
+  };
+}
+
+function markdownFileLinks(value) {
+  return [...String(value).matchAll(/\]\(([^)]+\.md(?:#[^)]*)?)\)/g)].map(
+    (match) => match[1],
+  );
+}
+
+function resolveMarkdownTarget(sourcePath, target) {
+  const fileTarget = decodeURIComponent(String(target).split("#")[0]);
+  return path.normalize(path.resolve(path.dirname(sourcePath), fileTarget));
 }
 
 function finalizeItems(items) {
   const byKey = new Map(items.map((item) => [item.key, item]));
+  const groupsWithMapAuthority = new Set(
+    items.filter((item) => item.hasMapAuthority).map((item) => item.group),
+  );
   return items.map((item) => {
     const blockedBy = [...new Set(item.blockedBy || [])];
     const unresolvedBlockers = blockedBy.filter((key) => {
       const blocker = byKey.get(key);
       return !blocker || blocker.lane !== "Done";
     });
-    const isOpen = item.lane !== "Done";
-    const isFrontier =
+    const isOpen = item.lane !== "Done" && item.lane !== "Artifact";
+    const isFrontierCandidate =
+      item.participatesInFrontier !== false &&
       isOpen &&
       unresolvedBlockers.length === 0 &&
       item.lane !== "Active" &&
       item.lane !== "Waiting";
+    const isFrontier =
+      Boolean(item.isDeclaredFrontier) ||
+      (!groupsWithMapAuthority.has(item.group) && isFrontierCandidate);
     return {
       ...item,
       blockedBy,
       isFrontier,
+      isFrontierCandidate,
     };
   });
 }
@@ -608,7 +723,20 @@ function htmlDocument(items) {
     .group > summary::before { content:"⌄"; width:13px; color:var(--secondary); font-size:11px; }
     .group:not([open]) > summary::before { content:"›"; }
     .group-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .group-link { color:inherit; text-decoration:none; }
+    .group-link:hover { color:var(--selection-strong); }
     .count { margin-left:auto; color:var(--tertiary); font-size:10px; font-variant-numeric:tabular-nums; }
+    .artifact-stage {
+      min-height:25px;
+      display:flex;
+      align-items:center;
+      border-top:1px solid rgba(60,60,67,.10);
+      background:#f6f6f7;
+      padding:0 13px;
+      color:var(--tertiary);
+      font-size:10px;
+      font-weight:600;
+    }
     .outline-row {
       width:100%;
       min-height:41px;
@@ -791,7 +919,7 @@ function htmlDocument(items) {
     const copy = ${safeCopy};
     const boardLocale = ${JSON.stringify(locale)};
     const byKey = new Map(items.map(item => [item.key, item]));
-    const laneOrder = ["Open","Triage","Ready","Active","Waiting","Blocked","Done"];
+    const laneOrder = ["Open","Triage","Ready","Active","Waiting","Blocked","Artifact","Done"];
     const search = document.querySelector("#search");
     const status = document.querySelector("#status");
     const treeView = document.querySelector("#treeView");
@@ -857,7 +985,7 @@ function htmlDocument(items) {
       const rows = [
         [copy.type, copy.types[item.type] || item.type],
         [copy.state, copy.lanes[item.lane] || item.lane],
-        [copy.effort, item.group || item.source],
+        [copy.effort, item.groupTitle || item.group || item.source],
         [copy.updated, formatDate(item.updatedAt)],
         [copy.source, item.source],
       ];
@@ -982,7 +1110,6 @@ function htmlDocument(items) {
     }
 
     function renderTree(visible) {
-      const visibleKeys = new Set(visible.map(item => item.key));
       const groups = [...new Set(visible.map(item => item.group || item.source))].sort();
       const root = Object.assign(document.createElement("div"), { className:"tree-root" });
       const header = Object.assign(document.createElement("div"), { className:"outline-header" });
@@ -992,35 +1119,61 @@ function htmlDocument(items) {
       const groupList = document.createElement("div");
       for (const groupName of groups) {
         const groupItems = visible.filter(item => (item.group || item.source) === groupName);
+        const groupMeta = groupItems[0] || {};
         const details = Object.assign(document.createElement("details"), { className:"group", open:true });
         const summary = document.createElement("summary");
+        const groupTitle = groupMeta.groupUrl
+          ? Object.assign(document.createElement("a"), {
+              className:"group-title group-link",
+              href:groupMeta.groupUrl,
+              textContent:groupMeta.groupTitle || groupName,
+            })
+          : Object.assign(document.createElement("span"), {
+              className:"group-title",
+              textContent:groupMeta.groupTitle || groupName,
+            });
+        groupTitle.addEventListener("click", event => event.stopPropagation());
         summary.append(
-          Object.assign(document.createElement("span"), { className:"group-title", textContent:groupName }),
+          groupTitle,
           Object.assign(document.createElement("span"), { className:"count", textContent:String(groupItems.length) })
         );
         const list = document.createElement("div");
-        const children = new Map();
-        for (const item of groupItems) {
-          if (item.parentId && visibleKeys.has(item.parentId)) {
-            if (!children.has(item.parentId)) children.set(item.parentId, []);
-            children.get(item.parentId).push(item);
+        function appendStage(stageItems, label, baseDepth = 0) {
+          if (stageItems.length === 0) return;
+          list.append(Object.assign(document.createElement("div"), {
+            className:"artifact-stage",
+            textContent:label,
+          }));
+          const stageKeys = new Set(stageItems.map(item => item.key));
+          const children = new Map();
+          for (const item of stageItems) {
+            if (item.parentId && stageKeys.has(item.parentId)) {
+              if (!children.has(item.parentId)) children.set(item.parentId, []);
+              children.get(item.parentId).push(item);
+            }
           }
+          const roots = stageItems.filter(item => !item.parentId || !stageKeys.has(item.parentId));
+          const rendered = new Set();
+          function branch(item, depth = baseDepth, ancestry = new Set()) {
+            const fragment = document.createDocumentFragment();
+            fragment.append(outlineRow(item, depth));
+            rendered.add(item.key);
+            if (ancestry.has(item.key)) return fragment;
+            const nextAncestry = new Set(ancestry);
+            nextAncestry.add(item.key);
+            const childItems = (children.get(item.key) || []).sort((a,b) => a.id.localeCompare(b.id, undefined, { numeric:true }));
+            for (const child of childItems) fragment.append(branch(child, depth + 1, nextAncestry));
+            return fragment;
+          }
+          for (const item of roots.sort((a,b) => a.id.localeCompare(b.id, undefined, { numeric:true }))) list.append(branch(item));
+          for (const item of stageItems.filter(item => !rendered.has(item.key))) list.append(branch(item));
         }
-        const roots = groupItems.filter(item => !item.parentId || !visibleKeys.has(item.parentId));
-        const rendered = new Set();
-        function branch(item, depth = 0, ancestry = new Set()) {
-          const fragment = document.createDocumentFragment();
-          fragment.append(outlineRow(item, depth));
-          rendered.add(item.key);
-          if (ancestry.has(item.key)) return fragment;
-          const nextAncestry = new Set(ancestry);
-          nextAncestry.add(item.key);
-          const childItems = (children.get(item.key) || []).sort((a,b) => a.id.localeCompare(b.id, undefined, { numeric:true }));
-          for (const child of childItems) fragment.append(branch(child, depth + 1, nextAncestry));
-          return fragment;
-        }
-        for (const item of roots.sort((a,b) => a.id.localeCompare(b.id, undefined, { numeric:true }))) list.append(branch(item));
-        for (const item of groupItems.filter(item => !rendered.has(item.key))) list.append(branch(item));
+        const productItems = groupItems.filter(item => !["specification", "implementation"].includes(item.stage));
+        const specificationItems = groupItems.filter(item => item.stage === "specification");
+        const implementationItems = groupItems.filter(item => item.stage === "implementation");
+        appendStage(productItems, copy.productDecisions);
+        appendStage(specificationItems, copy.specification);
+        appendStage(implementationItems, copy.implementation, specificationItems.length ? 1 : 0);
         details.append(summary, list);
         groupList.append(details);
       }
@@ -1032,19 +1185,50 @@ function htmlDocument(items) {
     function renderFlow(visible) {
       const visibleByKey = new Map(visible.map(item => [item.key, item]));
       const depthMemo = new Map();
-      function depth(item, visiting = new Set()) {
+      function productDepth(item, visiting = new Set()) {
         if (depthMemo.has(item.key)) return depthMemo.get(item.key);
         if (visiting.has(item.key)) return 0;
         const next = new Set(visiting);
         next.add(item.key);
-        const dependencies = item.blockedBy.map(key => visibleByKey.get(key)).filter(Boolean);
-        const value = dependencies.length ? Math.max(...dependencies.map(dependency => depth(dependency, next))) + 1 : 0;
+        const dependencies = item.blockedBy
+          .map(key => visibleByKey.get(key))
+          .filter(dependency => dependency && dependency.stage !== "implementation");
+        const value = dependencies.length
+          ? Math.max(...dependencies.map(dependency => productDepth(dependency, next))) + 1
+          : 0;
         depthMemo.set(item.key, value);
         return value;
       }
+      const implementationMemo = new Map();
+      function implementationDepth(item, visiting = new Set()) {
+        if (implementationMemo.has(item.key)) return implementationMemo.get(item.key);
+        if (visiting.has(item.key)) return 0;
+        const next = new Set(visiting);
+        next.add(item.key);
+        const dependencies = item.blockedBy
+          .map(key => visibleByKey.get(key))
+          .filter(dependency => dependency?.stage === "implementation");
+        const value = dependencies.length
+          ? Math.max(...dependencies.map(dependency => implementationDepth(dependency, next))) + 1
+          : 0;
+        implementationMemo.set(item.key, value);
+        return value;
+      }
+      const productItems = visible.filter(item => !["specification", "implementation"].includes(item.stage));
+      const productMaxDepth = productItems.length
+        ? Math.max(...productItems.map(item => productDepth(item)))
+        : -1;
+      const specificationBase = productMaxDepth + 1;
+      const hasSpecification = visible.some(item => item.stage === "specification");
+      const implementationBase = specificationBase + (hasSpecification ? 1 : 0);
       const columns = new Map();
       for (const item of visible) {
-        const value = depth(item);
+        const value =
+          item.stage === "specification"
+            ? specificationBase
+            : item.stage === "implementation"
+              ? implementationBase + implementationDepth(item)
+              : productDepth(item);
         if (!columns.has(value)) columns.set(value, []);
         columns.get(value).push(item);
       }
@@ -1103,7 +1287,16 @@ function htmlDocument(items) {
         stageTitle.setAttribute("class", "flow-stage-title");
         stageTitle.setAttribute("x", String(x));
         stageTitle.setAttribute("y", "34");
-        stageTitle.textContent = copy.stage + " " + (columnDepth + 1);
+        const columnItems = columns.get(columnDepth) || [];
+        const stages = new Set(columnItems.map(item => item.stage || "product"));
+        stageTitle.textContent =
+          stages.size === 1 && stages.has("specification")
+            ? copy.specification
+            : stages.size === 1 && stages.has("implementation")
+              ? copy.implementation
+              : stages.size === 1 && stages.has("product")
+                ? copy.productDecisions + " " + (columnDepth + 1)
+                : copy.stage + " " + (columnDepth + 1);
         svg.append(stage, stageTitle);
       }
       for (const item of visible) {
@@ -1470,12 +1663,15 @@ function boardCopy(locale) {
       treeSubtitle: "按工作流和父子关系组织全部事项",
       flowSubtitle: "从阻塞项到被阻塞事项的执行路径",
       frontier: "当前前沿",
-      currentFrontier: "当前可执行前沿",
+      currentFrontier: "当前主线前沿",
       ticket: "事项",
       totalItems: "全部事项",
       blockedItems: "阻塞事项",
       completedItems: "已完成",
       stage: "阶段",
+      productDecisions: "产品决定与验证",
+      specification: "Specification",
+      implementation: "实施事项",
       arrowMeaning: "箭头：阻塞项 → 被阻塞事项",
       visibleCount: "{count} 个可见事项",
       noItems: "没有匹配事项",
@@ -1502,6 +1698,7 @@ function boardCopy(locale) {
         Active: "进行中",
         Waiting: "等待中",
         Blocked: "被阻塞",
+        Artifact: "已生成",
         Done: "已完成",
       },
       types: {
@@ -1511,6 +1708,9 @@ function boardCopy(locale) {
         grilling: "产品确认",
         research: "研究",
         prototype: "原型",
+        "technical-spike": "技术验证",
+        spec: "规格",
+        implementation: "实施事项",
       },
     };
   }
@@ -1533,12 +1733,15 @@ function boardCopy(locale) {
     treeSubtitle: "All items organized by effort and parent-child relationship",
     flowSubtitle: "Execution path from blocker to blocked item",
     frontier: "Frontier",
-    currentFrontier: "Current frontier",
+    currentFrontier: "Active frontier",
     ticket: "Ticket",
     totalItems: "All items",
     blockedItems: "Blocked",
     completedItems: "Completed",
     stage: "Stage",
+    productDecisions: "Product decisions & validation",
+    specification: "Specification",
+    implementation: "Implementation",
     arrowMeaning: "Arrow: blocker → blocked ticket",
     visibleCount: "{count} visible item(s)",
     noItems: "No matching items",
@@ -1565,6 +1768,7 @@ function boardCopy(locale) {
       Active: "Active",
       Waiting: "Waiting",
       Blocked: "Blocked",
+      Artifact: "Published",
       Done: "Done",
     },
     types: {
@@ -1574,6 +1778,9 @@ function boardCopy(locale) {
       grilling: "Product decision",
       research: "Research",
       prototype: "Prototype",
+      "technical-spike": "Technical spike",
+      spec: "Specification",
+      implementation: "Implementation",
     },
   };
 }

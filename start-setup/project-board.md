@@ -20,8 +20,10 @@
 - Do not create board-only decisions, blockers, or lifecycle states.
 - Local HTML is read-only. Apply changes through the canonical tracker, then run the sync command.
 - A GitHub Project field must not override or silently diverge from canonical issue state.
-- `Tree` groups efforts and preserves known parent/child ticket relationships.
-- `Flow` draws blocker-to-blocked dependency edges and highlights the current executable frontier.
+- `Tree` keeps each Wayfinder Map as the effort root, preserves known parent/child ticket relationships, and shows a real specification and its implementation issues only after those canonical artifacts exist.
+- `Flow` draws blocker-to-blocked dependency edges and highlights the Map-declared Active frontier, or the derived executable frontier when no Map authority exists.
+- Product questions, headings, checklists, and ordinary document sections are inspector content, not board nodes. Research, Spike, Prototype, specification, implementation, and sub-issue nodes require their own canonical artifact.
+- When a Local Markdown Map declares an Active frontier, that declaration wins over a board-derived unblocked candidate calculation.
 
 ## Refresh Rules
 

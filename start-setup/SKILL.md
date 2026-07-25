@@ -96,8 +96,10 @@ Set the board interface language from the user's setup language or an existing r
 
 The local HTML surface always provides two tabs:
 
-- **Tree** — repository/project -> effort or map -> parent ticket -> child ticket, using canonical parent/sub-issue relationships when available;
-- **Flow** — blocker -> blocked ticket dependency edges, with the current unblocked and unclaimed frontier highlighted.
+- **Tree** — repository/project -> effort or map -> independently tracked product decisions or validation detours -> a real published specification -> implementation issues -> independently tracked sub-issues, using canonical parent/sub-issue relationships when available;
+- **Flow** — blocker -> blocked ticket dependency edges, with the Map-declared Active frontier highlighted when present and a derived unblocked/unclaimed frontier only when no Map authority exists.
+
+For Local Markdown, keep `map.md` as the navigation authority and use its declared Active frontier when present. A real `spec.md` appears only after it exists; implementation files under `issues/` are then shown beneath that specification. Product questions, headings, checklists, and ordinary document sections remain inside their owning ticket or specification and must not become board nodes. An independent Research, Technical Spike, Prototype, or sub-issue appears only when it has its own canonical tracker item and lifecycle.
 
 Do not invent hierarchy or dependencies from title similarity, numbering proximity, or visual placement. If a tracker does not expose a relationship, leave it unconnected rather than guessing.
 
