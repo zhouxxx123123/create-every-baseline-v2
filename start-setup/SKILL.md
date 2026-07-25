@@ -75,7 +75,7 @@ Record the choice in `docs/agents/issue-tracker.md`. The GitHub and GitLab templ
 
 **Section C — Project board surfaces.**
 
-> Explainer: A project board is a view of the issue tracker, not a second tracker. GitHub Project provides the shared online view; local HTML provides a read-only view at `127.0.0.1`. Both must project the same canonical ticket state.
+> Explainer: A project board is a view of the issue tracker, not a second tracker. GitHub Project provides the shared online management view; local HTML provides read-only `Tree` and dependency `Flow` views at `127.0.0.1`. Both must project the same canonical ticket state.
 
 Ask which mode to configure:
 
@@ -89,6 +89,13 @@ Ask which mode to configure:
 For a GitHub surface, confirm the exact project owner and title. Verify `gh auth status`, the `project` token scope, repository identity, and whether a matching project already exists before creating anything. Reuse only after the user confirms the exact match. Create with `gh project create`, link it to the repository, and record the resulting number and URL.
 
 For local HTML, default to port `4173`; choose another free localhost port without asking only when `4173` is occupied. The server must bind to `127.0.0.1`, expose only the board and explicitly selected local Markdown source files, and never bind to a public interface.
+
+The local HTML surface always provides two tabs:
+
+- **Tree** — repository/project -> effort or map -> parent ticket -> child ticket, using canonical parent/sub-issue relationships when available;
+- **Flow** — blocker -> blocked ticket dependency edges, with the current unblocked and unclaimed frontier highlighted.
+
+Do not invent hierarchy or dependencies from title similarity, numbering proximity, or visual placement. If a tracker does not expose a relationship, leave it unconnected rather than guessing.
 
 For every enabled board:
 
@@ -109,6 +116,7 @@ Use this machine-config shape, omitting tracker-specific properties that do not 
   "repoRoot": "..",
   "github": {
     "repository": "owner/repository",
+    "loadNativeRelationships": true,
     "triageLabels": {
       "needsInfo": "needs-info",
       "needsTriage": "needs-triage",

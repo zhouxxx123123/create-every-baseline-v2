@@ -5,6 +5,7 @@
 - GitHub Project: `<URL or Not configured>`
 - Local HTML: `<repo-relative output path or Not configured>`
 - Local URL: `http://127.0.0.1:<port>/`
+- Local views: `Tree | Flow`
 - Machine config: `.project-board/config.json`
 - Sync command: `node .project-board/project-board.mjs sync`
 - Serve command: `node .project-board/project-board.mjs serve`
@@ -17,6 +18,8 @@
 - Do not create board-only decisions, blockers, or lifecycle states.
 - Local HTML is read-only. Apply changes through the canonical tracker, then run the sync command.
 - A GitHub Project field must not override or silently diverge from canonical issue state.
+- `Tree` groups efforts and preserves known parent/child ticket relationships.
+- `Flow` draws blocker-to-blocked dependency edges and highlights the current executable frontier.
 
 ## Refresh Rules
 
