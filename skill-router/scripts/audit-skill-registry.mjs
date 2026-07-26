@@ -104,6 +104,57 @@ function findExplicitInvocations(text) {
   return [...names];
 }
 
+function inspectRoutingContracts(names, errors) {
+  const routerFile = names.get("skill-router");
+  const readinessFile = names.get("product-readiness");
+  const specFile = names.get("to-spec");
+  if (!routerFile || !readinessFile || !specFile) {
+    return;
+  }
+
+  const specText = fs.readFileSync(specFile, "utf8");
+  if (!specText.includes("READY_FOR_TO_SPEC")) {
+    return;
+  }
+
+  const routerText = fs.readFileSync(routerFile, "utf8");
+  const mainFlow = routerText.match(
+    /## The main flow:[^\n]*\n([\s\S]*?)(?=\n## )/,
+  )?.[1];
+  if (!mainFlow) {
+    errors.push(`Cannot locate the main flow in ${routerFile}`);
+    return;
+  }
+
+  const readinessIndex = mainFlow.indexOf("`/product-readiness`");
+  const specIndex = mainFlow.indexOf("`/to-spec`");
+  if (
+    readinessIndex === -1 ||
+    specIndex === -1 ||
+    readinessIndex > specIndex
+  ) {
+    errors.push(
+      `Main flow in ${routerFile} must route through product-readiness before to-spec.`,
+    );
+  }
+
+  const wayfinderHandoff = routerText.match(
+    /When the map clears,[\s\S]*?(?=\n\n|\n## )/,
+  )?.[0];
+  const wayfinderReadinessIndex =
+    wayfinderHandoff?.indexOf("`/product-readiness`") ?? -1;
+  const wayfinderSpecIndex = wayfinderHandoff?.indexOf("`/to-spec`") ?? -1;
+  if (
+    wayfinderReadinessIndex === -1 ||
+    wayfinderSpecIndex === -1 ||
+    wayfinderReadinessIndex > wayfinderSpecIndex
+  ) {
+    errors.push(
+      `Wayfinder handoff in ${routerFile} must route through product-readiness before to-spec.`,
+    );
+  }
+}
+
 function main() {
   let options;
   try {
@@ -217,6 +268,8 @@ function main() {
       }
     }
   }
+
+  inspectRoutingContracts(names, errors);
 
   const uniqueWarnings = [...new Set(warnings)];
   const uniqueErrors = [...new Set(errors)];
