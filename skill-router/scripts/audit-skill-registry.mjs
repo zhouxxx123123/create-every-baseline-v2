@@ -108,13 +108,23 @@ function inspectRoutingContracts(names, errors) {
   const routerFile = names.get("skill-router");
   const readinessFile = names.get("product-readiness");
   const specFile = names.get("to-spec");
-  if (!routerFile || !readinessFile || !specFile) {
+  const requiredSkills = [
+    ["skill-router", routerFile],
+    ["product-readiness", readinessFile],
+    ["to-spec", specFile],
+  ];
+  for (const [name, skillFile] of requiredSkills) {
+    if (!skillFile) {
+      errors.push(`Required routing skill '${name}' is missing.`);
+    }
+  }
+  if (requiredSkills.some(([, skillFile]) => !skillFile)) {
     return;
   }
 
   const specText = fs.readFileSync(specFile, "utf8");
   if (!specText.includes("READY_FOR_TO_SPEC")) {
-    return;
+    errors.push("to-spec must require a READY_FOR_TO_SPEC receipt.");
   }
 
   const routerText = fs.readFileSync(routerFile, "utf8");
@@ -138,9 +148,7 @@ function inspectRoutingContracts(names, errors) {
     );
   }
 
-  const wayfinderHandoff = routerText.match(
-    /When the map clears,[\s\S]*?(?=\n\n|\n## )/,
-  )?.[0];
+  const wayfinderHandoff = routerText.match(/^.*When the map clears,.*$/m)?.[0];
   const wayfinderReadinessIndex =
     wayfinderHandoff?.indexOf("`/product-readiness`") ?? -1;
   const wayfinderSpecIndex = wayfinderHandoff?.indexOf("`/to-spec`") ?? -1;
