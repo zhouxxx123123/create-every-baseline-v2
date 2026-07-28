@@ -2,13 +2,14 @@
 
 - Setup workflow: `FULL_SETUP | UPDATE_BOARD`
 - Mode: `NONE | LOCAL_HTML | GITHUB_PROJECT | DUAL`
-- Adapter version: `2`
+- Adapter version: `3`
 - Canonical state: `ISSUE_TRACKER`
 - Interface language: `zh-CN | en`
 - GitHub Project: `<URL or Not configured>`
 - Local HTML: `<repo-relative output path or Not configured>`
 - Local URL: `http://127.0.0.1:<port>/`
-- Local views: `Tree | Flow`
+- Local views: `Product Catalog | Tree | Flow`
+- Product catalog: `<repo-relative catalog path or Not configured>`
 - Machine config: `.project-board/config.json`
 - Quick open command: `board`
 - Doctor command: `node .project-board/project-board.mjs doctor`
@@ -22,6 +23,8 @@
 - `UPDATE_BOARD` changes only this projection setup; it preserves the existing Git destination, canonical tracker, Wayfinder Maps, tickets, domain rules, and prototype identity.
 - The configured issue tracker owns ticket content and workflow state.
 - GitHub Project and local HTML are projections of that same canonical state.
+- `Product Catalog` organizes stable product capabilities across efforts without replacing their canonical decisions, specifications, or implementation tickets.
+- Multiple Wayfinder Maps may contribute to one product catalog; Map directories remain historical workflow identities, not automatic product boundaries.
 - Do not create board-only decisions, blockers, or lifecycle states.
 - Local HTML is read-only. Apply changes through the canonical tracker, then run the sync command.
 - A GitHub Project field must not override or silently diverge from canonical issue state.
@@ -29,6 +32,16 @@
 - `Flow` draws blocker-to-blocked dependency edges and highlights the Map-declared Active frontier, or the derived executable frontier when no Map authority exists.
 - Product questions, headings, checklists, and ordinary document sections are inspector content, not board nodes. Research, Spike, Prototype, specification, implementation, and sub-issue nodes require their own canonical artifact.
 - When a Local Markdown Map declares an Active frontier, that declaration wins over a board-derived unblocked candidate calculation.
+
+## Product Catalog Rules
+
+- Do not require a complete product function tree before discovery. Open or claimed tickets without a stable mapping remain in `Exploration`.
+- After a decision is resolved, record one catalog effect in the same canonical write:
+  - `Catalog impact: ADD | UPDATE | SUPERSEDE | NO_CHANGE | NEEDS_CLASSIFICATION`
+  - `Catalog nodes: <stable-catalog-id>[, <stable-catalog-id>]` for `ADD`, `UPDATE`, or `SUPERSEDE`
+- Update the catalog Markdown only for stable capability changes. Keep full answers and evidence in their canonical tracker items.
+- Specifications and implementation tickets may declare the same `Catalog nodes` metadata so delivery status is derived automatically.
+- Board sync, doctor, rendering, and status derivation are deterministic. Use semantic assistance only for genuinely ambiguous mappings.
 
 ## Refresh Rules
 

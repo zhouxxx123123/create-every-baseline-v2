@@ -99,7 +99,7 @@ Record the choice in `docs/agents/issue-tracker.md`. The GitHub and GitLab templ
 
 **Section C — Project board surfaces.**
 
-> Explainer: A project board is a view of the issue tracker, not a second tracker. GitHub Project provides the shared online management view; local HTML provides read-only `Tree` and dependency `Flow` views at `127.0.0.1`. Both must project the same canonical ticket state.
+> Explainer: A project board is a view of canonical project artifacts, not a second tracker. GitHub Project provides the shared online management view; local HTML provides an optional product capability catalog, the tracker `Tree`, and dependency `Flow` at `127.0.0.1`. These views must derive state from the same canonical decisions, specifications, and implementation tickets.
 
 Ask which mode to configure:
 
@@ -120,8 +120,11 @@ The optional machine-level [board launcher](./scripts/board) provides the short 
 
 Set the board interface language from the user's setup language or an existing repository convention: use `zh-CN` for a Chinese setup conversation and `en` for an English setup conversation. Record the chosen locale without adding another question unless the signals conflict. This localizes board controls, states, legends, and known ticket types; canonical titles and labels remain unchanged.
 
-The local HTML surface always provides two tabs:
+For a product-oriented repository, enable the product catalog by default when local HTML is enabled and Wayfinder, product-readiness, product baselines, or equivalent product discovery artifacts are present. Do not ask the user to define a complete function tree during setup. Create an empty catalog from [product-catalog.md](./product-catalog.md), normally at `docs/product/product-catalog.md`, or reuse an existing explicit catalog path. For a clearly non-product repository, leave the optional catalog disabled unless the user requests it.
 
+The local HTML surface always provides tracker `Tree` and `Flow`, plus `Product Catalog` when configured:
+
+- **Product Catalog** — one product capability tree across all contributing efforts, with separate derived states for product decision, prototype validation, technical validation, specification, and implementation. Open or claimed product tickets without a stable capability mapping remain in `Exploration`; do not infer product hierarchy from ticket titles or Map directory names.
 - **Tree** — repository/project -> effort or map -> independently tracked product decisions or validation detours -> a real published specification -> implementation issues -> independently tracked sub-issues, using canonical parent/sub-issue relationships when available;
 - **Flow** — blocker -> blocked ticket dependency edges, with the Map-declared Active frontier highlighted when present and a derived unblocked/unclaimed frontier only when no Map authority exists.
 
@@ -129,21 +132,24 @@ For Local Markdown, keep `map.md` as the navigation authority and use its declar
 
 Do not invent hierarchy or dependencies from title similarity, numbering proximity, or visual placement. If a tracker does not expose a relationship, leave it unconnected rather than guessing.
 
+The product catalog grows after decisions, not before them. When a canonical decision is resolved, record `Catalog impact: ADD | UPDATE | SUPERSEDE | NO_CHANGE | NEEDS_CLASSIFICATION`. For `ADD`, `UPDATE`, and `SUPERSEDE`, also record `Catalog nodes:` with one or more stable catalog IDs and update the catalog's navigation summary and canonical links. Specifications and implementation tickets can declare the same `Catalog nodes` metadata so the board derives downstream progress. `NO_CHANGE` covers governance, research, or validation work that does not change the product tree. `NEEDS_CLASSIFICATION` is a temporary governance state and must not be silently guessed.
+
 For every enabled board:
 
 1. record human-facing authority and recovery instructions in `docs/agents/project-board.md` using [project-board.md](./project-board.md);
 2. create `.project-board/config.json` with `schemaVersion`, `adapterVersion`, `title`, `canonicalTracker`, `repoRoot`, tracker identity, and enabled surfaces;
 3. copy [scripts/project-board.mjs](./scripts/project-board.mjs) to `.project-board/project-board.mjs`;
-4. add `.project-board/index.html` to `.gitignore` because it is generated, while keeping the config and script tracked;
-5. run `node .project-board/project-board.mjs sync`;
-6. verify the local endpoint with `node .project-board/project-board.mjs serve`, request `http://127.0.0.1:<port>/`, then stop the verification server.
+4. when product catalog is enabled, create or preserve its configured Markdown file using [product-catalog.md](./product-catalog.md) as the empty seed;
+5. add `.project-board/index.html` to `.gitignore` because it is generated, while keeping the config and script tracked;
+6. run `node .project-board/project-board.mjs sync`;
+7. verify the local endpoint with `node .project-board/project-board.mjs serve`, request `http://127.0.0.1:<port>/`, then stop the verification server.
 
 Use this machine-config shape, omitting tracker-specific properties that do not apply:
 
 ```json
 {
   "schemaVersion": 1,
-  "adapterVersion": 2,
+  "adapterVersion": 3,
   "title": "项目看板",
   "locale": "zh-CN",
   "canonicalTracker": "github",
@@ -160,6 +166,10 @@ Use this machine-config shape, omitting tracker-specific properties that do not 
   },
   "localMarkdown": {
     "roots": [".scratch"]
+  },
+  "productCatalog": {
+    "enabled": true,
+    "path": "docs/product/product-catalog.md"
   },
   "surfaces": {
     "githubProject": {
@@ -193,7 +203,7 @@ After changing the bundled adapter or launcher, run the dependency-free regressi
 node "<resolved-start-setup-skill-dir>/scripts/test-project-board.mjs"
 ```
 
-It verifies canonical hierarchy, Map frontier authority, no invented specification, sub-issue relationships, config path containment, source symlink containment, localhost health identity, and live refresh.
+It verifies product catalog parsing and exploration, canonical hierarchy, Map frontier authority, no invented specification, sub-issue relationships, config path containment, source symlink containment, localhost health identity, and live refresh.
 
 The issue tracker remains canonical. GitHub Project and local HTML must not own separate decisions, blockers, lifecycle states, or copies of ticket content. After a successful canonical tracker write, skills follow `docs/agents/project-board.md` and run its sync command. A projection failure does not roll back a canonical write, but it must be reported accurately with the recovery command.
 

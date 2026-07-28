@@ -2,7 +2,6 @@
 
 set -eu
 
-expected_adapter_version=2
 cursor=${1:-"$PWD"}
 if [ ! -d "$cursor" ]; then
   printf 'board: project path is not a directory: %s\n' "$cursor" >&2
@@ -44,11 +43,6 @@ if [ "$local_port" = "DISABLED" ]; then
 fi
 configured_adapter_version=${local_port%%:*}
 local_port=${local_port#*:}
-if [ "$configured_adapter_version" != "$expected_adapter_version" ]; then
-  printf 'board: project adapter is outdated (%s, expected %s); run $start-setup in update-board mode.\n' \
-    "$configured_adapter_version" "$expected_adapter_version" >&2
-  exit 1
-fi
 
 url="http://127.0.0.1:$local_port/"
 open_url() {
@@ -68,9 +62,9 @@ if health=$(curl -fsS --max-time 1 "${url}health" 2>/dev/null); then
       process.stdout.write(String(health.adapterVersion ?? "UNKNOWN"));
     ' "$health"
   )
-  if [ "$running_adapter_version" != "$expected_adapter_version" ]; then
-    printf 'board: running server uses adapter %s, expected %s.\n' \
-      "$running_adapter_version" "$expected_adapter_version" >&2
+  if [ "$running_adapter_version" != "$configured_adapter_version" ]; then
+    printf 'board: running server uses adapter %s, project requires %s.\n' \
+      "$running_adapter_version" "$configured_adapter_version" >&2
     exit 1
   fi
   open_url "$url"
@@ -104,7 +98,7 @@ while [ "$attempt" -lt 50 ]; do
         process.stdout.write(String(health.adapterVersion ?? "UNKNOWN"));
       ' "$health"
     )
-    if [ "$running_adapter_version" = "$expected_adapter_version" ]; then
+    if [ "$running_adapter_version" = "$configured_adapter_version" ]; then
       break
     fi
   fi

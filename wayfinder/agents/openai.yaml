@@ -1,5 +1,6 @@
 interface:
   display_name: "Wayfinder"
   short_description: "Map a large effort as decision tickets"
+  default_prompt: "使用 $wayfinder 继续当前 Wayfinder Map，按照唯一 Active frontier 推进，并保持 canonical 决定与路由关系。"
 policy:
   allow_implicit_invocation: false

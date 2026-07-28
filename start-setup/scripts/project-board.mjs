@@ -6,7 +6,7 @@ import http from "node:http";
 import path from "node:path";
 import process from "node:process";
 
-const ADAPTER_VERSION = 2;
+const ADAPTER_VERSION = 3;
 const CONFIG_SCHEMA_VERSION = 1;
 const args = process.argv.slice(2);
 const command =
@@ -35,19 +35,26 @@ validateConfig();
 
 if (command === "sync") {
   const items = loadItems();
+  const catalog = loadProductCatalog(items);
   syncGitHubProject(items);
-  renderLocalHtml(items);
+  renderLocalHtml(items, catalog);
 } else if (command === "render") {
-  renderLocalHtml(loadItems());
+  const items = loadItems();
+  renderLocalHtml(items, loadProductCatalog(items));
 } else if (command === "serve") {
   const items = loadItems();
-  renderLocalHtml(items);
-  serveLocalHtml(items);
+  const catalog = loadProductCatalog(items);
+  renderLocalHtml(items, catalog);
+  serveLocalHtml(items, catalog);
 } else if (command === "doctor") {
   const items = loadItems();
+  const catalog = loadProductCatalog(items);
   const frontiers = items.filter((item) => item.isFrontier);
+  const catalogSummary = catalog
+    ? `, ${catalog.nodes.length} catalog node(s), ${catalog.needsClassification.length} catalog classification issue(s)`
+    : "";
   process.stdout.write(
-    `Project board configuration valid (adapter ${ADAPTER_VERSION}, ${items.length} item(s), ${frontiers.length} frontier(s)).\n`,
+    `Project board configuration valid (adapter ${ADAPTER_VERSION}, ${items.length} item(s), ${frontiers.length} frontier(s)${catalogSummary}).\n`,
   );
 } else {
   fail(
@@ -100,6 +107,15 @@ function validateConfig() {
     if (!/^[^/\s]+\/[^/\s]+$/.test(config.github?.repository || "")) {
       fail("github.repository must use owner/repository format");
     }
+  }
+
+  const catalog = config.productCatalog;
+  if (catalog?.enabled) {
+    const catalogPath = resolveRepoPath(catalog.path, "product catalog");
+    if (!fs.existsSync(catalogPath) || !fs.statSync(catalogPath).isFile()) {
+      fail(`Product catalog is not a file: ${catalog.path}`);
+    }
+    assertRealPathWithinRepo(catalogPath, "product catalog");
   }
 
   const project = config.surfaces?.githubProject;
@@ -180,11 +196,12 @@ function loadGitHubIssues(options = {}) {
 
   const issues = JSON.parse(raw);
   const items = issues.map((issue) => {
+    const body = String(issue.body || "");
     const labels = issue.labels.map((label) => label.name);
-    const blockedBy = parseGitHubReferences(issue.body, "Blocked by").map(
+    const blockedBy = parseGitHubReferences(body, "Blocked by").map(
       (number) => `github:#${number}`,
     );
-    const parentNumber = String(issue.body || "").match(
+    const parentNumber = body.match(
       /\bPart of\s+#(\d+)\b/i,
     )?.[1];
     return {
@@ -203,6 +220,11 @@ function loadGitHubIssues(options = {}) {
       group: "GitHub Issues",
       parentId: parentNumber ? `github:#${parentNumber}` : null,
       blockedBy,
+      catalogImpact: metadata(body, "Catalog impact")?.toUpperCase() || null,
+      catalogNodes: parseCatalogNodeIds(metadata(body, "Catalog nodes")),
+      productDecision: metadata(body, "Product decision"),
+      prototypeValidation: metadata(body, "Prototype validation"),
+      technicalValidation: metadata(body, "Technical validation"),
     };
   });
 
@@ -489,6 +511,11 @@ function readLocalArtifact(absolutePath) {
     group,
     parentId: null,
     participatesInFrontier: Boolean(status),
+    catalogImpact: metadata(body, "Catalog impact")?.toUpperCase() || null,
+    catalogNodes: parseCatalogNodeIds(metadata(body, "Catalog nodes")),
+    productDecision: metadata(body, "Product decision"),
+    prototypeValidation: metadata(body, "Prototype validation"),
+    technicalValidation: metadata(body, "Technical validation"),
   };
 }
 
@@ -552,6 +579,324 @@ function finalizeItems(items) {
       isFrontierCandidate,
     };
   });
+}
+
+function loadProductCatalog(items) {
+  const settings = config.productCatalog;
+  if (!settings?.enabled) return null;
+
+  const catalogPath = resolveRepoPath(settings.path, "product catalog");
+  const body = fs.readFileSync(catalogPath, "utf8");
+  const relativeCatalogPath = path.relative(repoRoot, catalogPath);
+  const catalogUrl = `/source?path=${encodeURIComponent(relativeCatalogPath)}`;
+  const itemByKey = new Map(items.map((item) => [item.key, item]));
+  const itemByUrl = new Map(items.map((item) => [item.url, item]));
+  const headings = [...body.matchAll(/^(#{2,6})\s+(.+?)\s*$/gm)].map((match) => ({
+    level: match[1].length,
+    title: match[2].trim(),
+    index: match.index,
+    contentStart: match.index + match[0].length,
+  }));
+  const nodes = [];
+  const nodeById = new Map();
+  const stack = [];
+
+  for (let index = 0; index < headings.length; index += 1) {
+    const heading = headings[index];
+    const sectionEnd = headings[index + 1]?.index ?? body.length;
+    const section = body.slice(heading.contentStart, sectionEnd);
+    const id = metadata(section, "Catalog ID");
+    if (!id) continue;
+    if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i.test(id)) {
+      fail(`Invalid Catalog ID "${id}" in ${settings.path}`);
+    }
+    if (nodeById.has(id)) {
+      fail(`Duplicate Catalog ID "${id}" in ${settings.path}`);
+    }
+
+    while (stack.length && stack.at(-1).level >= heading.level) stack.pop();
+    const parentId = stack.at(-1)?.id || null;
+    const sourceRefs = markdownLinks(section).map(({ label, target }) =>
+      catalogSourceReference(catalogPath, label, target, itemByKey, itemByUrl),
+    );
+    const node = {
+      id,
+      key: `catalog:${id}`,
+      title: heading.title,
+      parentId,
+      depth: stack.length,
+      phase: metadata(section, "Phase") || "Not recorded",
+      summary: metadata(section, "Summary") || "",
+      sourceRefs,
+      sourceKeys: sourceRefs.map((source) => source.itemKey).filter(Boolean),
+      url: `${catalogUrl}#${encodeURIComponent(id)}`,
+      updatedAt: fs.statSync(catalogPath).mtime.toISOString(),
+    };
+    nodes.push(node);
+    nodeById.set(id, node);
+    stack.push({ id, level: heading.level });
+  }
+
+  const allowedImpacts = new Set([
+    "ADD",
+    "UPDATE",
+    "SUPERSEDE",
+    "NO_CHANGE",
+    "NEEDS_CLASSIFICATION",
+  ]);
+  const needsClassification = [];
+  for (const item of items) {
+    if (item.catalogImpact && !allowedImpacts.has(item.catalogImpact)) {
+      fail(`Unsupported Catalog impact "${item.catalogImpact}" in ${item.id} · ${item.title}`);
+    }
+    if (item.catalogImpact === "NEEDS_CLASSIFICATION") {
+      needsClassification.push({
+        key: item.key,
+        id: item.id,
+        title: item.title,
+        url: item.url,
+      });
+    }
+    if (
+      ["ADD", "UPDATE", "SUPERSEDE"].includes(item.catalogImpact) &&
+      item.catalogNodes.length === 0
+    ) {
+      fail(`Catalog impact ${item.catalogImpact} requires Catalog nodes in ${item.id} · ${item.title}`);
+    }
+    for (const nodeId of item.catalogNodes) {
+      const node = nodeById.get(nodeId);
+      if (!node) {
+        fail(`Unknown Catalog node "${nodeId}" in ${item.id} · ${item.title}`);
+      }
+      if (!node.sourceKeys.includes(item.key)) node.sourceKeys.push(item.key);
+      if (!node.sourceRefs.some((source) => source.itemKey === item.key)) {
+        node.sourceRefs.push({
+          title: `${item.id} · ${item.title}`,
+          url: item.url,
+          itemKey: item.key,
+        });
+      }
+    }
+  }
+
+  const children = new Map();
+  for (const node of nodes) {
+    if (!node.parentId) continue;
+    if (!children.has(node.parentId)) children.set(node.parentId, []);
+    children.get(node.parentId).push(node);
+  }
+
+  function completeNode(node, ancestry = new Set()) {
+    if (ancestry.has(node.id)) fail(`Product catalog cycle detected at "${node.id}"`);
+    const nextAncestry = new Set(ancestry);
+    nextAncestry.add(node.id);
+    const childNodes = (children.get(node.id) || []).map((child) =>
+      completeNode(child, nextAncestry),
+    );
+    const sourceItems = node.sourceKeys.map((key) => itemByKey.get(key)).filter(Boolean);
+    const direct = catalogStatuses(sourceItems);
+    const inherited = childNodes.map((child) => child.statuses);
+    node.statuses = {
+      productDecision: aggregateCatalogStatus(
+        [direct.productDecision, ...inherited.map((status) => status.productDecision)],
+        "product",
+      ),
+      prototypeValidation: aggregateCatalogStatus(
+        [direct.prototypeValidation, ...inherited.map((status) => status.prototypeValidation)],
+        "validation",
+      ),
+      technicalValidation: aggregateCatalogStatus(
+        [direct.technicalValidation, ...inherited.map((status) => status.technicalValidation)],
+        "technical",
+      ),
+      specification: aggregateCatalogStatus(
+        [direct.specification, ...inherited.map((status) => status.specification)],
+        "delivery",
+      ),
+      implementation: aggregateCatalogStatus(
+        [direct.implementation, ...inherited.map((status) => status.implementation)],
+        "delivery",
+      ),
+    };
+    const timestamps = sourceItems
+      .map((item) => Date.parse(item.updatedAt))
+      .filter(Number.isFinite);
+    if (timestamps.length) node.updatedAt = new Date(Math.max(...timestamps)).toISOString();
+    return node;
+  }
+
+  for (const node of nodes.filter((candidate) => !candidate.parentId)) completeNode(node);
+
+  const mappedItemKeys = new Set(nodes.flatMap((node) => node.sourceKeys));
+  const exploration = items
+    .filter(
+      (item) =>
+        item.stage === "product" &&
+        item.lane !== "Done" &&
+        item.lane !== "Artifact" &&
+        !mappedItemKeys.has(item.key),
+    )
+    .map((item) => ({
+      key: item.key,
+      id: item.id,
+      title: item.title,
+      lane: item.lane,
+      group: item.groupTitle || item.group,
+      url: item.url,
+      updatedAt: item.updatedAt,
+    }));
+
+  return {
+    title: body.match(/^#\s+(.+)$/m)?.[1]?.trim() || "Product Catalog",
+    path: relativeCatalogPath,
+    url: catalogUrl,
+    nodes,
+    exploration,
+    needsClassification,
+  };
+}
+
+function catalogSourceReference(catalogPath, label, target, itemByKey, itemByUrl) {
+  if (/^https?:\/\//i.test(target)) {
+    const item = itemByUrl.get(target);
+    return {
+      title: label || item?.title || target,
+      url: target,
+      itemKey: item?.key || null,
+    };
+  }
+
+  const targetPath = resolveMarkdownTarget(catalogPath, target);
+  const relative = path.relative(repoRoot, targetPath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    fail(`Product catalog source escapes repoRoot: ${target}`);
+  }
+  if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isFile()) {
+    fail(`Product catalog source does not exist: ${target}`);
+  }
+  assertRealPathWithinRepo(targetPath, "product catalog source");
+  const key = `local:${relative}`;
+  const item = itemByKey.get(key);
+  const sourceBody = fs.readFileSync(targetPath, "utf8");
+  return {
+    title:
+      label ||
+      item?.title ||
+      sourceBody.match(/^#\s+(.+)$/m)?.[1]?.trim() ||
+      path.basename(targetPath, ".md"),
+    url: item?.url || `/source?path=${encodeURIComponent(relative)}`,
+    itemKey: item?.key || null,
+  };
+}
+
+function catalogStatuses(items) {
+  const productItems = items.filter((item) => item.stage === "product");
+  const specifications = items.filter((item) => item.stage === "specification");
+  const implementation = items.filter((item) => item.stage === "implementation");
+  return {
+    productDecision: aggregateCatalogStatus(
+      productItems.map(productDecisionStatus),
+      "product",
+    ),
+    prototypeValidation: aggregateCatalogStatus(
+      productItems.map((item) => validationStatus(item.prototypeValidation)),
+      "validation",
+    ),
+    technicalValidation: aggregateCatalogStatus(
+      productItems.map((item) => technicalStatus(item.technicalValidation)),
+      "technical",
+    ),
+    specification: deliveryStatus(specifications, true),
+    implementation: deliveryStatus(implementation, false),
+  };
+}
+
+function productDecisionStatus(item) {
+  const explicit = String(item.productDecision || "").toUpperCase();
+  if (explicit.includes("CONFIRMED")) return "CONFIRMED";
+  if (explicit.includes("PARTIAL")) return "PARTIAL";
+  if (explicit.includes("UNRESOLVED") || explicit.includes("UNCONFIRMED")) {
+    return "UNCONFIRMED";
+  }
+  if (item.lane === "Done") return "CONFIRMED";
+  if (item.lane === "Active" || item.lane === "Waiting") return "IN_PROGRESS";
+  return "UNCONFIRMED";
+}
+
+function validationStatus(value) {
+  const normalized = String(value || "").toUpperCase().replaceAll("-", "_");
+  if (!normalized) return "NOT_RECORDED";
+  if (normalized.includes("NOT_VALIDATED") || normalized.includes("UNVALIDATED")) {
+    return "NOT_VALIDATED";
+  }
+  if (normalized.includes("PARTIAL")) return "PARTIALLY_VALIDATED";
+  if (normalized.includes("VALIDATED")) return "VALIDATED";
+  return "NOT_RECORDED";
+}
+
+function technicalStatus(value) {
+  const normalized = String(value || "").toUpperCase().replaceAll("-", "_");
+  if (!normalized) return "NOT_RECORDED";
+  if (normalized.includes("NOT_NEEDED") || normalized.includes("NOT_REQUIRED")) {
+    return "NOT_NEEDED";
+  }
+  if (normalized.includes("NOT_VALIDATED") || normalized.includes("UNVALIDATED")) {
+    return "NOT_VALIDATED";
+  }
+  if (normalized.includes("PARTIAL")) return "PARTIALLY_VALIDATED";
+  if (normalized.includes("VALIDATED")) return "VALIDATED";
+  return "NOT_RECORDED";
+}
+
+function deliveryStatus(items, publishedMeansComplete) {
+  if (items.length === 0) return "NOT_STARTED";
+  if (items.every((item) => item.lane === "Done" || (publishedMeansComplete && item.lane === "Artifact"))) {
+    return "COMPLETED";
+  }
+  if (items.some((item) => ["Active", "Waiting"].includes(item.lane))) {
+    return "IN_PROGRESS";
+  }
+  return "NOT_STARTED";
+}
+
+function aggregateCatalogStatus(values, kind) {
+  const statuses = values.filter(
+    (value) => value && !["NOT_MAPPED", "NOT_RECORDED", "NOT_STARTED"].includes(value),
+  );
+  if (statuses.length === 0) {
+    if (kind === "product") return "NOT_MAPPED";
+    if (kind === "delivery") return "NOT_STARTED";
+    return "NOT_RECORDED";
+  }
+  const unique = new Set(statuses);
+  if (unique.size === 1) return statuses[0];
+  if (kind === "product") {
+    if (unique.has("IN_PROGRESS")) return "IN_PROGRESS";
+    return "PARTIAL";
+  }
+  if (kind === "delivery") {
+    if (unique.has("IN_PROGRESS")) return "IN_PROGRESS";
+    return unique.has("COMPLETED") ? "IN_PROGRESS" : "NOT_STARTED";
+  }
+  if (unique.has("PARTIALLY_VALIDATED")) return "PARTIALLY_VALIDATED";
+  if (unique.has("VALIDATED") && unique.size > 1) return "PARTIALLY_VALIDATED";
+  if (unique.has("NOT_VALIDATED")) return "NOT_VALIDATED";
+  if (unique.has("NOT_NEEDED") && unique.size > 1) return "PARTIALLY_VALIDATED";
+  return statuses[0];
+}
+
+function markdownLinks(value) {
+  return [...String(value).matchAll(/\[([^\]]*)\]\(([^)]+)\)/g)].map((match) => ({
+    label: match[1].trim(),
+    target: match[2].trim(),
+  }));
+}
+
+function parseCatalogNodeIds(value) {
+  return String(value || "")
+    .split(/[,，\s]+/)
+    .map((candidate) => candidate.trim())
+    .filter(Boolean);
 }
 
 function metadata(body, key) {
@@ -636,7 +981,7 @@ function collectIssueUrls(value, urls = new Set()) {
   return urls;
 }
 
-function renderLocalHtml(items) {
+function renderLocalHtml(items, catalog = null) {
   const local = config.surfaces?.localHtml;
   if (!local?.enabled) return;
 
@@ -646,13 +991,13 @@ function renderLocalHtml(items) {
   );
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   assertRealPathWithinRepo(path.dirname(outputPath), "local HTML output directory");
-  fs.writeFileSync(outputPath, htmlDocument(items), "utf8");
+  fs.writeFileSync(outputPath, htmlDocument(items, catalog), "utf8");
   process.stdout.write(
     `Local HTML rendered (${items.length} item(s)): ${path.relative(repoRoot, outputPath)}\n`,
   );
 }
 
-function htmlDocument(items) {
+function htmlDocument(items, catalog = null) {
   const safeData = JSON.stringify(items)
     .replaceAll("<", "\\u003c")
     .replaceAll(">", "\\u003e")
@@ -661,6 +1006,10 @@ function htmlDocument(items) {
   const locale = config.locale === "zh-CN" ? "zh-CN" : "en";
   const copy = boardCopy(locale);
   const safeCopy = JSON.stringify(copy)
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("&", "\\u0026");
+  const safeCatalog = JSON.stringify(catalog)
     .replaceAll("<", "\\u003c")
     .replaceAll(">", "\\u003e")
     .replaceAll("&", "\\u0026");
@@ -874,6 +1223,71 @@ function htmlDocument(items) {
     .lane-Active .state-label::before, .frontier .state-label::before { background:var(--frontier); }
     .lane-Blocked .state-label::before { background:var(--blocked); }
     .lane-Done .state-label::before { background:var(--done); }
+    .catalog-header, .catalog-row {
+      display:grid;
+      grid-template-columns:minmax(300px,1fr) repeat(5,minmax(92px,112px));
+      align-items:center;
+    }
+    .catalog-header {
+      position:sticky;
+      top:0;
+      z-index:3;
+      min-height:34px;
+      border-bottom:1px solid var(--hairline);
+      background:rgba(250,250,250,.92);
+      color:var(--secondary);
+      font-size:10px;
+      backdrop-filter:blur(16px);
+    }
+    .catalog-header span { padding:0 9px; }
+    .catalog-header span + span { border-left:1px solid var(--hairline); }
+    .catalog-row {
+      width:100%;
+      min-height:50px;
+      border:0;
+      border-bottom:1px solid rgba(60,60,67,.10);
+      background:#fff;
+      padding:0;
+      text-align:left;
+    }
+    .catalog-row:hover { background:#f7f7f8; }
+    .catalog-row.selected { background:var(--selection); }
+    .catalog-row > span { min-width:0; padding:0 9px; }
+    .catalog-row > span + span { border-left:1px solid rgba(60,60,67,.08); }
+    .catalog-name { padding-left:calc(12px + var(--depth,0) * 20px) !important; }
+    .catalog-name strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:550; }
+    .catalog-name small { display:block; margin-top:3px; overflow:hidden; color:var(--tertiary); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+    .catalog-status {
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      color:var(--secondary);
+      font-size:10px;
+      line-height:1.25;
+    }
+    .catalog-status::before { content:""; flex:0 0 auto; width:6px; height:6px; border-radius:50%; background:#c7c7cc; }
+    .catalog-status.status-CONFIRMED::before,
+    .catalog-status.status-VALIDATED::before,
+    .catalog-status.status-COMPLETED::before,
+    .catalog-status.status-NOT_NEEDED::before { background:var(--done); }
+    .catalog-status.status-IN_PROGRESS::before,
+    .catalog-status.status-PARTIAL::before,
+    .catalog-status.status-PARTIALLY_VALIDATED::before { background:var(--warning); }
+    .catalog-status.status-UNCONFIRMED::before,
+    .catalog-status.status-NOT_VALIDATED::before { background:var(--blocked); }
+    .catalog-section-title {
+      min-height:30px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      border-top:1px solid var(--hairline);
+      border-bottom:1px solid var(--hairline);
+      background:#f6f6f7;
+      padding:0 13px;
+      color:var(--secondary);
+      font-size:10px;
+      font-weight:600;
+    }
     .empty { display:grid; place-items:center; min-height:240px; color:var(--secondary); }
     .flow-head {
       min-height:45px;
@@ -926,11 +1340,14 @@ function htmlDocument(items) {
     .inspector-status::before { content:""; width:7px; height:7px; border-radius:50%; background:#c7c7cc; }
     .inspector-section { padding:14px 16px; border-bottom:1px solid var(--hairline); }
     .inspector-section h3 { margin:0 0 9px; color:var(--tertiary); font-size:10px; font-weight:600; }
+    .inspector-summary { margin:0 0 10px; color:var(--secondary); font-size:11px; line-height:1.55; }
     .detail-row { display:grid; grid-template-columns:74px minmax(0,1fr); gap:8px; padding:4px 0; font-size:11px; line-height:1.45; }
     .detail-row dt { color:var(--secondary); }
     .detail-row dd { margin:0; overflow-wrap:anywhere; }
     .tag-list { display:flex; gap:5px; flex-wrap:wrap; }
     .tag { border:1px solid var(--hairline); border-radius:5px; background:#fff; padding:2px 6px; color:var(--secondary); font-size:10px; }
+    a.tag { text-decoration:none; }
+    a.tag:hover { color:var(--selection-strong); border-color:rgba(10,132,255,.35); }
     .open-button {
       width:calc(100% - 32px);
       min-height:30px;
@@ -945,6 +1362,9 @@ function htmlDocument(items) {
       :root { --source-width:198px; --inspector-width:244px; }
       .outline-header, .outline-row { grid-template-columns:minmax(220px,1fr) 96px 92px; }
       .outline-header span:last-child, .outline-row > span:last-child { display:none; }
+      .catalog-header, .catalog-row { grid-template-columns:minmax(250px,1fr) repeat(3,minmax(84px,100px)); }
+      .catalog-header span:nth-child(5), .catalog-header span:nth-child(6),
+      .catalog-row > span:nth-child(5), .catalog-row > span:nth-child(6) { display:none; }
     }
     @media (max-width:820px) {
       .window { display:block; min-height:100vh; }
@@ -979,7 +1399,10 @@ function htmlDocument(items) {
         <div class="nav-section">
           <div class="nav-label">${escapeHtml(copy.boardViews)}</div>
           <div class="tabs" role="tablist" aria-label="${escapeHtml(copy.boardViews)}">
-            <button id="treeTab" role="tab" aria-controls="treeView" aria-selected="true">
+            ${catalog ? `<button id="catalogTab" role="tab" aria-controls="catalogView" aria-selected="true">
+              <span class="nav-icon">▦</span><span class="nav-name">${escapeHtml(copy.catalog)}</span><span></span>
+            </button>` : ""}
+            <button id="treeTab" role="tab" aria-controls="treeView" aria-selected="${catalog ? "false" : "true"}">
               <span class="nav-icon">≡</span><span class="nav-name">${escapeHtml(copy.tree)}</span><span></span>
             </button>
             <button id="flowTab" role="tab" aria-controls="flowView" aria-selected="false">
@@ -991,7 +1414,7 @@ function htmlDocument(items) {
           <div class="nav-label">${escapeHtml(copy.statusOverview)}</div>
           <div id="statusList" class="status-list"></div>
         </div>
-        <div class="nav-section">
+        <div id="effortSection" class="nav-section">
           <div class="nav-label">${escapeHtml(copy.efforts)}</div>
           <div id="effortList" class="effort-list"></div>
         </div>
@@ -1014,7 +1437,8 @@ function htmlDocument(items) {
           </div>
         </header>
         <div class="content">
-          <div id="treeView" class="view" role="tabpanel" aria-labelledby="treeTab"></div>
+          ${catalog ? `<div id="catalogView" class="view" role="tabpanel" aria-labelledby="catalogTab"></div>` : ""}
+          <div id="treeView" class="view" role="tabpanel" aria-labelledby="treeTab"${catalog ? " hidden" : ""}></div>
           <div id="flowView" class="view" role="tabpanel" aria-labelledby="flowTab" hidden></div>
         </div>
       </main>
@@ -1026,20 +1450,27 @@ function htmlDocument(items) {
   </div>
   <script>
     const items = ${safeData};
+    const catalog = ${safeCatalog};
     const copy = ${safeCopy};
     const boardLocale = ${JSON.stringify(locale)};
     const byKey = new Map(items.map(item => [item.key, item]));
+    const catalogById = new Map((catalog?.nodes || []).map(node => [node.id, node]));
     const laneOrder = ["Open","Triage","Ready","Active","Waiting","Blocked","Artifact","Done"];
     const search = document.querySelector("#search");
     const status = document.querySelector("#status");
+    const catalogView = document.querySelector("#catalogView");
     const treeView = document.querySelector("#treeView");
     const flowView = document.querySelector("#flowView");
     const statusList = document.querySelector("#statusList");
     const effortList = document.querySelector("#effortList");
+    const effortSection = document.querySelector("#effortSection");
     const viewHeading = document.querySelector("#viewHeading");
     const viewSummary = document.querySelector("#viewSummary");
     const inspectorContent = document.querySelector("#inspectorContent");
     let selectedGroup = "";
+    let currentView = catalog ? "catalog" : "tree";
+    let selectedCatalogId = sessionStorage.getItem("project-board:catalog-selected");
+    if (!catalogById.has(selectedCatalogId)) selectedCatalogId = catalog?.nodes?.[0]?.id || "";
     const savedSelection = sessionStorage.getItem("project-board:selected");
     let selectedKey = byKey.has(savedSelection)
       ? savedSelection
@@ -1056,6 +1487,37 @@ function htmlDocument(items) {
       });
     }
 
+    function visibleCatalogNodes() {
+      const needle = search.value.trim().toLowerCase();
+      if (!needle) return catalog?.nodes || [];
+      const directlyMatched = new Set(
+        (catalog?.nodes || [])
+          .filter(node =>
+            [node.id,node.title,node.summary,node.phase,...node.sourceRefs.map(source => source.title)]
+              .join(" ")
+              .toLowerCase()
+              .includes(needle),
+          )
+          .map(node => node.id),
+      );
+      for (const node of catalog?.nodes || []) {
+        if (!directlyMatched.has(node.id)) continue;
+        let parentId = node.parentId;
+        while (parentId) {
+          directlyMatched.add(parentId);
+          parentId = catalogById.get(parentId)?.parentId;
+        }
+      }
+      return (catalog?.nodes || []).filter(node => directlyMatched.has(node.id));
+    }
+
+    function visibleExploration() {
+      const needle = search.value.trim().toLowerCase();
+      return (catalog?.exploration || []).filter(item =>
+        !needle || [item.id,item.title,item.group].join(" ").toLowerCase().includes(needle),
+      );
+    }
+
     function formatDate(value) {
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return copy.notAvailable;
@@ -1063,12 +1525,85 @@ function htmlDocument(items) {
     }
 
     function selectItem(item) {
+      selectedCatalogId = "";
       selectedKey = item.key;
       sessionStorage.setItem("project-board:selected", selectedKey);
       render();
     }
 
+    function selectCatalogNode(node) {
+      selectedCatalogId = node.id;
+      sessionStorage.setItem("project-board:catalog-selected", selectedCatalogId);
+      render();
+    }
+
     function renderInspector() {
+      const catalogNode = currentView === "catalog" ? catalogById.get(selectedCatalogId) : null;
+      if (catalogNode) {
+        const hero = Object.assign(document.createElement("section"), { className:"inspector-hero" });
+        hero.append(
+          Object.assign(document.createElement("div"), {
+            className:"inspector-kicker",
+            textContent:catalogNode.id + " · " + copy.capability,
+          }),
+          Object.assign(document.createElement("h2"), { textContent:catalogNode.title }),
+          Object.assign(document.createElement("div"), {
+            className:"inspector-status",
+            textContent:copy.catalogStatuses[catalogNode.statuses.productDecision] || catalogNode.statuses.productDecision,
+          }),
+        );
+        const details = Object.assign(document.createElement("section"), { className:"inspector-section" });
+        details.append(Object.assign(document.createElement("h3"), { textContent:copy.properties }));
+        const list = document.createElement("dl");
+        const rows = [
+          [copy.phase, catalogNode.phase],
+          [copy.productDecision, copy.catalogStatuses[catalogNode.statuses.productDecision] || catalogNode.statuses.productDecision],
+          [copy.prototypeValidation, copy.catalogStatuses[catalogNode.statuses.prototypeValidation] || catalogNode.statuses.prototypeValidation],
+          [copy.technicalValidation, copy.catalogStatuses[catalogNode.statuses.technicalValidation] || catalogNode.statuses.technicalValidation],
+          [copy.specification, copy.catalogStatuses[catalogNode.statuses.specification] || catalogNode.statuses.specification],
+          [copy.implementation, copy.catalogStatuses[catalogNode.statuses.implementation] || catalogNode.statuses.implementation],
+        ];
+        for (const [label, value] of rows) {
+          const row = Object.assign(document.createElement("div"), { className:"detail-row" });
+          row.append(
+            Object.assign(document.createElement("dt"), { textContent:label }),
+            Object.assign(document.createElement("dd"), { textContent:value || copy.notAvailable }),
+          );
+          list.append(row);
+        }
+        details.append(list);
+        const sourceSection = Object.assign(document.createElement("section"), { className:"inspector-section" });
+        sourceSection.append(Object.assign(document.createElement("h3"), { textContent:copy.canonicalSources }));
+        if (catalogNode.summary) {
+          sourceSection.append(Object.assign(document.createElement("p"), {
+            className:"inspector-summary",
+            textContent:catalogNode.summary,
+          }));
+        }
+        const sourceList = Object.assign(document.createElement("div"), { className:"tag-list" });
+        for (const source of catalogNode.sourceRefs) {
+          const link = Object.assign(document.createElement("a"), {
+            className:"tag",
+            href:source.url,
+            textContent:source.title,
+          });
+          sourceList.append(link);
+        }
+        if (catalogNode.sourceRefs.length === 0) {
+          sourceList.append(Object.assign(document.createElement("span"), {
+            className:"tag",
+            textContent:copy.derivedFromChildren,
+          }));
+        }
+        sourceSection.append(sourceList);
+        const openCatalog = Object.assign(document.createElement("button"), {
+          className:"open-button",
+          textContent:copy.openCatalog,
+        });
+        openCatalog.addEventListener("click", () => window.open(catalog.url, "_self"));
+        inspectorContent.replaceChildren(hero, details, sourceSection, openCatalog);
+        return;
+      }
       const item = byKey.get(selectedKey);
       if (!item) {
         inspectorContent.replaceChildren(Object.assign(document.createElement("div"), {
@@ -1148,11 +1683,17 @@ function htmlDocument(items) {
     }
 
     function initializeSidebar() {
-      const summaryRows = [
-        ["frontier", copy.currentFrontier, items.filter(item => item.isFrontier).length],
-        ["blocked", copy.blockedItems, items.filter(item => item.lane === "Blocked").length],
-        ["done", copy.completedItems, items.filter(item => item.lane === "Done").length]
-      ];
+      const summaryRows = currentView === "catalog"
+        ? [
+            ["done", copy.confirmedCapabilities, (catalog?.nodes || []).filter(node => node.statuses.productDecision === "CONFIRMED").length],
+            ["frontier", copy.evolvingCapabilities, (catalog?.nodes || []).filter(node => ["PARTIAL","IN_PROGRESS"].includes(node.statuses.productDecision)).length],
+            ["blocked", copy.unconfirmedCapabilities, (catalog?.nodes || []).filter(node => ["UNCONFIRMED","NOT_MAPPED"].includes(node.statuses.productDecision)).length],
+          ]
+        : [
+            ["frontier", copy.currentFrontier, items.filter(item => item.isFrontier).length],
+            ["blocked", copy.blockedItems, items.filter(item => item.lane === "Blocked").length],
+            ["done", copy.completedItems, items.filter(item => item.lane === "Done").length],
+          ];
       statusList.replaceChildren(...summaryRows.map(([className, label, value]) => {
         const row = Object.assign(document.createElement("div"), { className:"status-row" });
         row.append(
@@ -1184,6 +1725,7 @@ function htmlDocument(items) {
         });
         return button;
       }));
+      effortSection.hidden = currentView === "catalog";
     }
 
     function outlineRow(item, depth) {
@@ -1290,6 +1832,124 @@ function htmlDocument(items) {
       if (groups.length === 0) groupList.append(Object.assign(document.createElement("div"), { className:"empty", textContent:copy.noItems }));
       root.append(header, groupList);
       treeView.replaceChildren(root);
+    }
+
+    function catalogStatusCell(value) {
+      return Object.assign(document.createElement("span"), {
+        className:"catalog-status status-" + value,
+        textContent:copy.catalogStatuses[value] || value,
+      });
+    }
+
+    function catalogRow(node) {
+      const row = Object.assign(document.createElement("button"), {
+        className:"catalog-row" + (node.id === selectedCatalogId ? " selected" : ""),
+        type:"button",
+      });
+      row.style.setProperty("--depth", String(node.depth));
+      const name = Object.assign(document.createElement("span"), { className:"catalog-name" });
+      name.append(
+        Object.assign(document.createElement("strong"), { textContent:node.title }),
+        Object.assign(document.createElement("small"), {
+          textContent:[node.phase, node.summary].filter(Boolean).join(" · "),
+        }),
+      );
+      row.append(
+        name,
+        catalogStatusCell(node.statuses.productDecision),
+        catalogStatusCell(node.statuses.prototypeValidation),
+        catalogStatusCell(node.statuses.technicalValidation),
+        catalogStatusCell(node.statuses.specification),
+        catalogStatusCell(node.statuses.implementation),
+      );
+      row.addEventListener("click", () => selectCatalogNode(node));
+      row.addEventListener("dblclick", () => window.open(node.url, "_self"));
+      return row;
+    }
+
+    function explorationRow(item) {
+      const row = Object.assign(document.createElement("button"), {
+        className:"catalog-row" + (item.key === selectedKey && !selectedCatalogId ? " selected" : ""),
+        type:"button",
+      });
+      row.style.setProperty("--depth", "0");
+      const name = Object.assign(document.createElement("span"), { className:"catalog-name" });
+      name.append(
+        Object.assign(document.createElement("strong"), { textContent:item.title }),
+        Object.assign(document.createElement("small"), { textContent:item.id + " · " + item.group }),
+      );
+      const decisionStatus =
+        item.lane === "Active" || item.lane === "Waiting" ? "IN_PROGRESS" : "UNCONFIRMED";
+      row.append(
+        name,
+        catalogStatusCell(decisionStatus),
+        catalogStatusCell("NOT_RECORDED"),
+        catalogStatusCell("NOT_RECORDED"),
+        catalogStatusCell("NOT_STARTED"),
+        catalogStatusCell("NOT_STARTED"),
+      );
+      row.addEventListener("click", () => selectItem(byKey.get(item.key)));
+      row.addEventListener("dblclick", () => window.open(item.url, "_self"));
+      return row;
+    }
+
+    function renderCatalog() {
+      if (!catalogView || !catalog) return;
+      const visibleNodes = visibleCatalogNodes();
+      const visibleNodeIds = new Set(visibleNodes.map(node => node.id));
+      const children = new Map();
+      for (const node of visibleNodes) {
+        if (node.parentId && visibleNodeIds.has(node.parentId)) {
+          if (!children.has(node.parentId)) children.set(node.parentId, []);
+          children.get(node.parentId).push(node);
+        }
+      }
+      const root = document.createElement("div");
+      const header = Object.assign(document.createElement("div"), { className:"catalog-header" });
+      for (const label of [
+        copy.capability,
+        copy.productDecision,
+        copy.prototypeValidation,
+        copy.technicalValidation,
+        copy.specification,
+        copy.implementation,
+      ]) {
+        header.append(Object.assign(document.createElement("span"), { textContent:label }));
+      }
+      root.append(header);
+      const rendered = new Set();
+      function branch(node, ancestry = new Set()) {
+        if (ancestry.has(node.id)) return;
+        const next = new Set(ancestry);
+        next.add(node.id);
+        root.append(catalogRow(node));
+        rendered.add(node.id);
+        for (const child of children.get(node.id) || []) branch(child, next);
+      }
+      for (const node of visibleNodes.filter(node => !node.parentId || !visibleNodeIds.has(node.parentId))) {
+        branch(node);
+      }
+      for (const node of visibleNodes.filter(node => !rendered.has(node.id))) branch(node);
+
+      const exploration = visibleExploration();
+      if (exploration.length) {
+        const section = Object.assign(document.createElement("div"), {
+          className:"catalog-section-title",
+        });
+        section.append(
+          Object.assign(document.createElement("span"), { textContent:copy.exploration }),
+          Object.assign(document.createElement("span"), { textContent:String(exploration.length) }),
+        );
+        root.append(section);
+        for (const item of exploration) root.append(explorationRow(item));
+      }
+      if (visibleNodes.length === 0 && exploration.length === 0) {
+        root.append(Object.assign(document.createElement("div"), {
+          className:"empty",
+          textContent:copy.noItems,
+        }));
+      }
+      catalogView.replaceChildren(root);
     }
 
     function renderFlow(visible) {
@@ -1483,29 +2143,59 @@ function htmlDocument(items) {
 
     function render() {
       const visible = visibleItems();
-      viewSummary.textContent = copy.visibleCount.replace("{count}", visible.length);
+      const catalogCount = visibleCatalogNodes().length + visibleExploration().length;
+      viewSummary.textContent = copy.visibleCount.replace(
+        "{count}",
+        currentView === "catalog" ? catalogCount : visible.length,
+      );
+      renderCatalog();
       renderTree(visible);
       renderFlow(visible);
       renderInspector();
     }
 
     function selectView(name) {
-      const treeSelected = name === "tree";
+      currentView = name === "catalog" && catalog ? "catalog" : name === "flow" ? "flow" : "tree";
+      const catalogSelected = currentView === "catalog";
+      const treeSelected = currentView === "tree";
+      const flowSelected = currentView === "flow";
       sessionStorage.setItem("project-board:view", name);
+      if (document.querySelector("#catalogTab")) {
+        document.querySelector("#catalogTab").setAttribute("aria-selected", String(catalogSelected));
+      }
       document.querySelector("#treeTab").setAttribute("aria-selected", String(treeSelected));
-      document.querySelector("#flowTab").setAttribute("aria-selected", String(!treeSelected));
+      document.querySelector("#flowTab").setAttribute("aria-selected", String(flowSelected));
+      if (catalogView) catalogView.hidden = !catalogSelected;
       treeView.hidden = !treeSelected;
-      flowView.hidden = treeSelected;
-      viewHeading.textContent = treeSelected ? copy.structure : copy.dependencies;
-      viewSummary.textContent = copy.visibleCount.replace("{count}", visibleItems().length);
+      flowView.hidden = !flowSelected;
+      viewHeading.textContent = catalogSelected
+        ? copy.productCatalog
+        : treeSelected
+          ? copy.structure
+          : copy.dependencies;
+      status.disabled = catalogSelected;
+      initializeSidebar();
+      render();
     }
     search.addEventListener("input", render);
     status.addEventListener("change", render);
+    if (document.querySelector("#catalogTab")) {
+      document.querySelector("#catalogTab").addEventListener("click", () => selectView("catalog"));
+    }
     document.querySelector("#treeTab").addEventListener("click", () => selectView("tree"));
     document.querySelector("#flowTab").addEventListener("click", () => selectView("flow"));
-    initializeSidebar();
-    render();
-    selectView(sessionStorage.getItem("project-board:view") === "flow" ? "flow" : "tree");
+    const savedView = sessionStorage.getItem("project-board:view");
+    selectView(
+      catalog && !["tree","flow"].includes(savedView)
+        ? "catalog"
+        : savedView === "flow"
+          ? "flow"
+          : savedView === "tree"
+            ? "tree"
+            : catalog
+              ? "catalog"
+              : "tree",
+    );
     if (window.EventSource) {
       const events = new EventSource("/events");
       events.addEventListener("board-updated", () => window.location.reload());
@@ -1515,7 +2205,7 @@ function htmlDocument(items) {
 </html>`;
 }
 
-function serveLocalHtml(initialItems) {
+function serveLocalHtml(initialItems, initialCatalog = null) {
   const local = config.surfaces?.localHtml;
   if (!local?.enabled) fail("Local HTML surface is not enabled");
   const outputPath = resolveRepoPath(
@@ -1528,7 +2218,7 @@ function serveLocalHtml(initialItems) {
     liveRefresh !== false && liveRefresh?.enabled !== false;
   const debounceMs = Math.max(50, Number(liveRefresh?.debounceMs || 300));
   const clients = new Set();
-  let currentFingerprint = boardFingerprint(initialItems);
+  let currentFingerprint = boardFingerprint(initialItems, initialCatalog);
   let refreshTimer = null;
   let refreshing = false;
   let queuedReason = null;
@@ -1551,9 +2241,10 @@ function serveLocalHtml(initialItems) {
         process.stderr.write(`Live refresh skipped (${reason}): tracker read failed.\n`);
         return;
       }
-      const nextFingerprint = boardFingerprint(items);
+      const catalog = loadProductCatalog(items);
+      const nextFingerprint = boardFingerprint(items, catalog);
       if (nextFingerprint === currentFingerprint) return;
-      renderLocalHtml(items);
+      renderLocalHtml(items, catalog);
       currentFingerprint = nextFingerprint;
       notifyClients();
       process.stdout.write(`Project board refreshed (${reason}).\n`);
@@ -1646,6 +2337,12 @@ function startLocalMarkdownWatch(scheduleRefresh, options = {}) {
   const roots = (config.localMarkdown?.roots || [".scratch"])
     .map((root) => path.resolve(repoRoot, root))
     .filter((root) => fs.existsSync(root));
+  if (config.productCatalog?.enabled) {
+    const catalogDirectory = path.dirname(
+      resolveRepoPath(config.productCatalog.path, "product catalog"),
+    );
+    if (!roots.includes(catalogDirectory)) roots.push(catalogDirectory);
+  }
   const watchers = [];
   let polling = false;
 
@@ -1716,10 +2413,11 @@ function localMarkdownSignature(roots) {
     .join("|");
 }
 
-function boardFingerprint(items) {
-  return JSON.stringify(
-    [...items].sort((a, b) => a.key.localeCompare(b.key)),
-  );
+function boardFingerprint(items, catalog = null) {
+  return JSON.stringify({
+    items: [...items].sort((a, b) => a.key.localeCompare(b.key)),
+    catalog,
+  });
 }
 
 function sendFile(response, filePath, contentType) {
@@ -1735,6 +2433,13 @@ function send(response, status, body) {
 
 function allowedSource(target) {
   if (!fs.existsSync(target)) return false;
+  if (config.productCatalog?.enabled) {
+    const catalogPath = assertRealPathWithinRepo(
+      resolveRepoPath(config.productCatalog.path, "product catalog"),
+      "product catalog",
+    );
+    if (fs.realpathSync(target) === catalogPath) return true;
+  }
   const roots = (config.localMarkdown?.roots || [".scratch"]).map((root) =>
     assertRealPathWithinRepo(
       resolveRepoPath(root, "Local Markdown root"),
@@ -1787,8 +2492,10 @@ function boardCopy(locale) {
       searchPlaceholder: "搜索标题、编号、标签或负责人",
       allStatuses: "全部状态",
       boardViews: "看板视图",
+      catalog: "产品目录",
       tree: "树状图",
       flow: "流程图",
+      productCatalog: "产品功能目录",
       structure: "项目结构",
       dependencies: "依赖流程",
       treeSubtitle: "按工作流和父子关系组织全部事项",
@@ -1799,7 +2506,19 @@ function boardCopy(locale) {
       totalItems: "全部事项",
       blockedItems: "阻塞事项",
       completedItems: "已完成",
+      confirmedCapabilities: "已确认能力",
+      evolvingCapabilities: "确认中能力",
+      unconfirmedCapabilities: "未确认能力",
       stage: "阶段",
+      phase: "产品阶段",
+      capability: "产品能力",
+      productDecision: "产品决定",
+      prototypeValidation: "原型验证",
+      technicalValidation: "技术验证",
+      canonicalSources: "权威来源",
+      derivedFromChildren: "由子能力汇总",
+      openCatalog: "打开产品目录",
+      exploration: "正在探索，尚未进入稳定产品目录",
       productDecisions: "产品决定与验证",
       specification: "Specification",
       implementation: "实施事项",
@@ -1843,6 +2562,20 @@ function boardCopy(locale) {
         spec: "规格",
         implementation: "实施事项",
       },
+      catalogStatuses: {
+        CONFIRMED: "已确认",
+        PARTIAL: "部分确认",
+        IN_PROGRESS: "确认中",
+        UNCONFIRMED: "未确认",
+        NOT_MAPPED: "尚未映射",
+        VALIDATED: "已验证",
+        PARTIALLY_VALIDATED: "部分验证",
+        NOT_VALIDATED: "未验证",
+        NOT_RECORDED: "未记录",
+        NOT_NEEDED: "不需要",
+        NOT_STARTED: "未开始",
+        COMPLETED: "已完成",
+      },
     };
   }
   return {
@@ -1857,8 +2590,10 @@ function boardCopy(locale) {
     searchPlaceholder: "Search title, ID, label, or assignee",
     allStatuses: "All statuses",
     boardViews: "Board views",
+    catalog: "Product catalog",
     tree: "Tree",
     flow: "Flow",
+    productCatalog: "Product capability catalog",
     structure: "Project structure",
     dependencies: "Dependency flow",
     treeSubtitle: "All items organized by effort and parent-child relationship",
@@ -1869,7 +2604,19 @@ function boardCopy(locale) {
     totalItems: "All items",
     blockedItems: "Blocked",
     completedItems: "Completed",
+    confirmedCapabilities: "Confirmed capabilities",
+    evolvingCapabilities: "Capabilities in progress",
+    unconfirmedCapabilities: "Unconfirmed capabilities",
     stage: "Stage",
+    phase: "Product phase",
+    capability: "Product capability",
+    productDecision: "Product decision",
+    prototypeValidation: "Prototype validation",
+    technicalValidation: "Technical validation",
+    canonicalSources: "Canonical sources",
+    derivedFromChildren: "Aggregated from child capabilities",
+    openCatalog: "Open product catalog",
+    exploration: "Exploration not yet in the stable product catalog",
     productDecisions: "Product decisions & validation",
     specification: "Specification",
     implementation: "Implementation",
@@ -1912,6 +2659,20 @@ function boardCopy(locale) {
       "technical-spike": "Technical spike",
       spec: "Specification",
       implementation: "Implementation",
+    },
+    catalogStatuses: {
+      CONFIRMED: "Confirmed",
+      PARTIAL: "Partially confirmed",
+      IN_PROGRESS: "In progress",
+      UNCONFIRMED: "Unconfirmed",
+      NOT_MAPPED: "Not mapped",
+      VALIDATED: "Validated",
+      PARTIALLY_VALIDATED: "Partially validated",
+      NOT_VALIDATED: "Not validated",
+      NOT_RECORDED: "Not recorded",
+      NOT_NEEDED: "Not needed",
+      NOT_STARTED: "Not started",
+      COMPLETED: "Completed",
     },
   };
 }

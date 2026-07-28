@@ -52,6 +52,8 @@ Blocked by: None
 Type: grilling
 Status: claimed
 Blocked by: 01
+Catalog impact: UPDATE
+Catalog nodes: core.current
 `,
   );
   write(
@@ -98,6 +100,28 @@ Status: open
 Blocked by: None
 `,
   );
+  write(
+    "docs/product/product-catalog.md",
+    `# Product Catalog
+
+Catalog schema: 1
+
+## Core product
+
+Catalog ID: core
+Phase: V1
+Summary: Stable product capabilities.
+
+### Current decisions
+
+Catalog ID: core.current
+Phase: V1
+Summary: Confirmed and active decisions contribute to one capability.
+Sources:
+
+- [Decision 01](../../.scratch/current/decisions/01-complete.md)
+`,
+  );
 
   const outsideSource = path.join(temporaryRoot, "outside.md");
   fs.writeFileSync(outsideSource, "outside repository", "utf8");
@@ -108,12 +132,16 @@ Blocked by: None
 
   writeJson(".project-board/config.json", {
     schemaVersion: 1,
-    adapterVersion: 2,
+    adapterVersion: 3,
     title: "Regression board",
     locale: "en",
     canonicalTracker: "local-markdown",
     repoRoot: "..",
     localMarkdown: { roots: [".scratch"] },
+    productCatalog: {
+      enabled: true,
+      path: "docs/product/product-catalog.md",
+    },
     surfaces: {
       githubProject: { enabled: false },
       localHtml: {
@@ -139,6 +167,7 @@ function testHierarchyAndFrontier() {
   const historical = items.find(
     (item) => item.id === "44" && item.group === "legacy",
   );
+  const catalog = readRenderedCatalog();
 
   assert.deepEqual(frontier.map((item) => item.title), ["Decision 02"]);
   assert.equal(specification?.stage, "specification");
@@ -150,9 +179,15 @@ function testHierarchyAndFrontier() {
     ).length,
     0,
   );
+  assert.equal(catalog.nodes.length, 2);
+  assert.equal(catalog.nodes.find((node) => node.id === "core.current")?.statuses.productDecision, "IN_PROGRESS");
+  assert.deepEqual(catalog.exploration.map((item) => item.title), ["Second-stage decision"]);
 
   const doctor = runAdapter("doctor");
-  assert.match(doctor.stdout, /configuration valid \(adapter 2, 6 item\(s\), 1 frontier\(s\)\)/);
+  assert.match(
+    doctor.stdout,
+    /configuration valid \(adapter 3, 6 item\(s\), 1 frontier\(s\), 2 catalog node\(s\), 0 catalog classification issue\(s\)\)/,
+  );
 }
 
 function testPathContainment() {
@@ -164,6 +199,22 @@ function testPathContainment() {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /local HTML output escapes repoRoot/);
   assert.equal(fs.existsSync(path.join(temporaryRoot, "outside.html")), false);
+
+  const unsafeCatalogConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  unsafeCatalogConfig.productCatalog.path = "../outside.md";
+  const unsafeCatalogPath = path.join(
+    projectRoot,
+    ".project-board",
+    "unsafe-catalog.json",
+  );
+  fs.writeFileSync(
+    unsafeCatalogPath,
+    JSON.stringify(unsafeCatalogConfig, null, 2),
+    "utf8",
+  );
+  const catalogResult = runAdapter("sync", unsafeCatalogPath, false);
+  assert.notEqual(catalogResult.status, 0);
+  assert.match(catalogResult.stderr, /product catalog escapes repoRoot/);
 }
 
 async function testServerAndLiveRefresh() {
@@ -189,7 +240,7 @@ async function testServerAndLiveRefresh() {
     return response.status === 200;
   });
   const health = JSON.parse((await request(`http://127.0.0.1:${port}/health`)).body);
-  assert.equal(health.adapterVersion, 2);
+  assert.equal(health.adapterVersion, 3);
 
   const escaped = await request(
     `http://127.0.0.1:${port}/source?path=.scratch/current/escape.md`,
@@ -210,6 +261,7 @@ async function testServerAndLiveRefresh() {
   const rendered = await request(`http://127.0.0.1:${port}/`);
   assert.equal(rendered.status, 200);
   assert.match(rendered.body, /start-setup-project-board/);
+  assert.match(rendered.body, /Product catalog/);
   assert.match(output, /Project board refreshed/);
 
   server.kill("SIGTERM");
@@ -244,8 +296,18 @@ function readRenderedItems() {
     path.join(projectRoot, ".project-board", "index.html"),
     "utf8",
   );
-  const match = html.match(/const items = (\[[\s\S]*?\]);\n\s+const copy/);
+  const match = html.match(/const items = (\[[\s\S]*?\]);\n\s+const catalog/);
   assert.ok(match, "rendered item data is present");
+  return JSON.parse(match[1]);
+}
+
+function readRenderedCatalog() {
+  const html = fs.readFileSync(
+    path.join(projectRoot, ".project-board", "index.html"),
+    "utf8",
+  );
+  const match = html.match(/const catalog = (\{[\s\S]*?\});\n\s+const copy/);
+  assert.ok(match, "rendered product catalog data is present");
   return JSON.parse(match[1]);
 }
 
