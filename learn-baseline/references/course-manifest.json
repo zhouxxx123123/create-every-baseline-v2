@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "courseId": "learn-baseline",
+  "courseVersion": "1.0.0",
+  "defaultLocale": "zh-CN",
+  "tracks": [
+    {
+      "id": "foundation",
+      "kind": "foundation",
+      "title": "Choose and enter the right workflow",
+      "file": "references/track-foundation.md",
+      "prerequisites": [],
+      "skills": [
+        "start-setup",
+        "skill-router",
+        "handoff",
+        "agent-reach",
+        "teach",
+        "caveman",
+        "zoom-out"
+      ],
+      "checkpoints": [
+        {
+          "id": "FND-01",
+          "title": "Route requests by outcome",
+          "evidence": "learner-artifacts/foundation-routing.md"
+        },
+        {
+          "id": "FND-02",
+          "title": "Establish repository authority",
+          "evidence": "learner-artifacts/foundation-setup-review.md"
+        },
+        {
+          "id": "FND-03",
+          "title": "Preserve a cross-session return path",
+          "evidence": "learner-artifacts/foundation-handoff.md"
+        },
+        {
+          "id": "FND-04",
+          "title": "Use standalone tools without confusing the main flow",
+          "evidence": "learner-artifacts/foundation-standalone-tools.md"
+        }
+      ]
+    },
+    {
+      "id": "product-discovery",
+      "kind": "elective",
+      "title": "Resolve product decisions and map large efforts",
+      "file": "references/track-product-discovery.md",
+      "prerequisites": [
+        "foundation"
+      ],
+      "skills": [
+        "grilling",
+        "grill-me",
+        "grill-with-docs",
+        "domain-modeling",
+        "wayfinder",
+        "pre-prd-hardening"
+      ],
+      "checkpoints": [
+        {
+          "id": "PD-01",
+          "title": "Separate terms, facts, and decisions",
+          "evidence": "learner-artifacts/product-domain-model.md"
+        },
+        {
+          "id": "PD-02",
+          "title": "Resolve one product question",
+          "evidence": "learner-artifacts/product-decision.md"
+        },
+        {
+          "id": "PD-03",
+          "title": "Create a decision map and frontier",
+          "evidence": "learner-artifacts/product-wayfinder-map.md"
+        },
+        {
+          "id": "PD-04",
+          "title": "Harden a bounded target",
+          "evidence": "learner-artifacts/product-hardening-review.md"
+        }
+      ]
+    },
+    {
+      "id": "evidence-validation",
+      "kind": "elective",
+      "title": "Route evidence to research, prototype, or technical spike",
+      "file": "references/track-evidence-validation.md",
+      "prerequisites": [
+        "foundation"
+      ],
+      "skills": [
+        "research",
+        "prototype",
+        "technical-spike",
+        "product-readiness"
+      ],
+      "checkpoints": [
+        {
+          "id": "EV-01",
+          "title": "Classify the uncertainty",
+          "evidence": "learner-artifacts/evidence-routing.md"
+        },
+        {
+          "id": "EV-02",
+          "title": "Write a bounded research contract",
+          "evidence": "learner-artifacts/evidence-research-brief.md"
+        },
+        {
+          "id": "EV-03",
+          "title": "Define prototype and spike contracts",
+          "evidence": "learner-artifacts/evidence-validation-contracts.md"
+        },
+        {
+          "id": "EV-04",
+          "title": "Apply the readiness gate",
+          "evidence": "learner-artifacts/evidence-readiness-assessment.md"
+        }
+      ]
+    },
+    {
+      "id": "delivery",
+      "kind": "elective",
+      "title": "Move confirmed product context into implementation",
+      "file": "references/track-delivery.md",
+      "prerequisites": [
+        "foundation"
+      ],
+      "skills": [
+        "to-spec",
+        "to-prd",
+        "to-tickets",
+        "to-issues",
+        "prd-implementation-precheck",
+        "implement",
+        "tdd",
+        "code-review",
+        "prototype-parity-check"
+      ],
+      "checkpoints": [
+        {
+          "id": "DL-01",
+          "title": "Verify the specification boundary",
+          "evidence": "learner-artifacts/delivery-spec-boundary.md"
+        },
+        {
+          "id": "DL-02",
+          "title": "Design a tracer-bullet ticket plan",
+          "evidence": "learner-artifacts/delivery-ticket-plan.md"
+        },
+        {
+          "id": "DL-03",
+          "title": "Write an implementation contract",
+          "evidence": "learner-artifacts/delivery-implementation-contract.md"
+        },
+        {
+          "id": "DL-04",
+          "title": "Choose seams and review a change",
+          "evidence": "learner-artifacts/delivery-test-review.md"
+        },
+        {
+          "id": "DL-05",
+          "title": "Close visible work against prototype evidence",
+          "evidence": "learner-artifacts/delivery-parity-closeout.md"
+        }
+      ]
+    },
+    {
+      "id": "engineering-maintenance",
+      "kind": "elective",
+      "title": "Diagnose, triage, and improve a codebase",
+      "file": "references/track-engineering-maintenance.md",
+      "prerequisites": [
+        "foundation"
+      ],
+      "skills": [
+        "diagnosing-bugs",
+        "diagnose",
+        "resolving-merge-conflicts",
+        "codebase-design",
+        "improve-codebase-architecture",
+        "triage"
+      ],
+      "checkpoints": [
+        {
+          "id": "EM-01",
+          "title": "Build a red feedback loop",
+          "evidence": "learner-artifacts/maintenance-bug-loop.md"
+        },
+        {
+          "id": "EM-02",
+          "title": "Identify a deepening opportunity",
+          "evidence": "learner-artifacts/maintenance-architecture.md"
+        },
+        {
+          "id": "EM-03",
+          "title": "Triage a raw request",
+          "evidence": "learner-artifacts/maintenance-triage.md"
+        },
+        {
+          "id": "EM-04",
+          "title": "Plan a non-destructive conflict recovery",
+          "evidence": "learner-artifacts/maintenance-conflict-recovery.md"
+        }
+      ]
+    },
+    {
+      "id": "skill-authoring",
+      "kind": "elective",
+      "title": "Create and maintain predictable skills",
+      "file": "references/track-skill-authoring.md",
+      "prerequisites": [
+        "foundation"
+      ],
+      "skills": [
+        "write-a-skill",
+        "writing-great-skills"
+      ],
+      "checkpoints": [
+        {
+          "id": "SA-01",
+          "title": "Design the invocation contract",
+          "evidence": "learner-artifacts/authoring-invocation-contract.md"
+        },
+        {
+          "id": "SA-02",
+          "title": "Place steps, references, scripts, and assets",
+          "evidence": "learner-artifacts/authoring-skill-plan.md"
+        },
+        {
+          "id": "SA-03",
+          "title": "Validate a draft skill",
+          "evidence": "learner-artifacts/authoring-validation.md"
+        },
+        {
+          "id": "SA-04",
+          "title": "Update routing without stale names",
+          "evidence": "learner-artifacts/authoring-routing-audit.md"
+        }
+      ]
+    },
+    {
+      "id": "capstone",
+      "kind": "capstone",
+      "title": "Route and complete a fresh workflow",
+      "file": "references/track-capstone.md",
+      "prerequisites": [
+        "foundation"
+      ],
+      "skills": [],
+      "checkpoints": [
+        {
+          "id": "CP-01",
+          "title": "Select and bound a fresh scenario",
+          "evidence": "learner-artifacts/capstone-brief.md"
+        },
+        {
+          "id": "CP-02",
+          "title": "Design the route and stop conditions",
+          "evidence": "learner-artifacts/capstone-route.md"
+        },
+        {
+          "id": "CP-03",
+          "title": "Execute the route",
+          "evidence": "learner-artifacts/capstone-execution.md"
+        },
+        {
+          "id": "CP-04",
+          "title": "Review evidence and repair one weakness",
+          "evidence": "learner-artifacts/capstone-review.md"
+        },
+        {
+          "id": "CP-05",
+          "title": "Teach back the workflow",
+          "evidence": "learner-artifacts/capstone-teachback.md"
+        }
+      ]
+    }
+  ],
+  "aliases": {
+    "diagnose": "diagnosing-bugs",
+    "to-prd": "to-spec",
+    "to-issues": "to-tickets"
+  }
+}

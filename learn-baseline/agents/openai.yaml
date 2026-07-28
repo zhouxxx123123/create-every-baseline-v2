@@ -1,0 +1,6 @@
+interface:
+  display_name: "Learn Baseline"
+  short_description: "Learn the skill workflow through guided practice"
+  default_prompt: "Use $learn-baseline to start or resume the interactive course for this skill collection."
+policy:
+  allow_implicit_invocation: false

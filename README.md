@@ -81,6 +81,12 @@ $technical-spike
 $skill-router
 ```
 
+想通过互动练习系统学习整套工作流时，调用：
+
+```text
+$learn-baseline
+```
+
 ## 推荐工作流
 
 ```text
@@ -130,7 +136,7 @@ $skill-router
 
 ## Skill 目录
 
-当前仓库包含 34 个有效 Skill。
+当前仓库包含 35 个有效 Skill。
 
 ### 初始化与导航
 
@@ -184,6 +190,7 @@ $skill-router
 
 | Skill | 用途 |
 | --- | --- |
+| `learn-baseline` | 通过诊断分流、互动 checkpoint、安全练习仓库和跨会话进度学习整套 Skill 工作流 |
 | `write-a-skill` | 创建具有标准目录、渐进披露和配套资源的新 Skill |
 | `writing-great-skills` | 编写可预测 Skill 的原则、术语和审查参考 |
 | `agent-reach` | 调用外部工具搜索和读取多个互联网平台 |
@@ -331,6 +338,15 @@ git diff --check
 - 显式 Skill 引用可解析；
 - 没有被禁止的旧名称重新进入集成表面。
 
+互动课程还应运行：
+
+```bash
+node learn-baseline/scripts/validate-course.mjs
+node --test learn-baseline/scripts/test-course.mjs
+```
+
+课程校验要求每个现有 Skill 恰好进入一个教学路线，并检查 checkpoint ID、证据路径、课程文件和兼容别名。新增或重命名 Skill 后，课程覆盖检查会失败，直到课程地图同步更新。
+
 ## 移除或重命名 Skill
 
 不要只删除目录。先审计所有集成位置：
@@ -371,6 +387,10 @@ node skill-router/scripts/audit-skill-integrations.mjs \
 `agent-reach` 的元数据保留了其上游项目链接：
 
 - [Panniantong/Agent-Reach](https://github.com/Panniantong/Agent-Reach)
+
+`learn-baseline` 的互动教学状态机参考了 Carl Vellotti 公开课程所展示的逐步实践、学习者门槛和检查点思路，但课程结构、协议、练习材料和脚本均为本仓库独立实现：
+
+- [Claude Code for Product Managers](https://ccforpms.com/advanced/write-prd)
 
 其他外部链接用于说明工具、规范或参考概念，不表示它们拥有本仓库全部 Skill。
 
