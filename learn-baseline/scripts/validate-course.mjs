@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,6 +12,7 @@ const manifestPath = join(skillDir, "references", "course-manifest.json");
 const requiredMarkers = [
   "**Outcome:**",
   "**Concept:**",
+  "**Skill practice:**",
   "**Learner action:**",
   "**Evidence:**",
   "**Hint ladder:**",
@@ -21,12 +23,23 @@ const requiredMarkers = [
 
 const errors = [];
 let manifest;
+let skillContracts;
 
 try {
   manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 } catch (error) {
   fail(`Cannot read course manifest: ${error.message}`);
   finish();
+}
+try {
+  const contractPath = resolve(skillDir, manifest.skillContractsFile ?? "");
+  skillContracts = JSON.parse(readFileSync(contractPath, "utf8"));
+} catch (error) {
+  fail(`Cannot read skill contract identities: ${error.message}`);
+  skillContracts = { skills: {} };
+}
+if (skillContracts.schemaVersion !== 1) {
+  fail(`Unsupported skill contract schema: ${skillContracts.schemaVersion}`);
 }
 
 if (manifest.schemaVersion !== 1) {
@@ -41,7 +54,10 @@ if (!Array.isArray(manifest.tracks) || manifest.tracks.length === 0) {
 
 const trackIds = new Set();
 const checkpointIds = new Set();
+const evidencePaths = new Set();
 const coveredSkills = new Map();
+const practicedSkills = new Map();
+const referenceSkills = new Map();
 let checkpointCount = 0;
 
 for (const track of manifest.tracks ?? []) {
@@ -70,6 +86,19 @@ for (const track of manifest.tracks ?? []) {
     }
   }
 
+  for (const skillName of track.referenceSkills ?? []) {
+    if (!(track.skills ?? []).includes(skillName)) {
+      fail(`Track ${track.id} has out-of-scope reference skill: ${skillName}`);
+    }
+    if (referenceSkills.has(skillName)) {
+      fail(`Reference skill appears more than once: ${skillName}`);
+    }
+    referenceSkills.set(skillName, track.id);
+    if (!content.includes(`\`${skillName}\``)) {
+      fail(`Track ${track.id} does not name reference skill \`${skillName}\``);
+    }
+  }
+
   for (const checkpoint of track.checkpoints ?? []) {
     checkpointCount += 1;
     if (checkpointIds.has(checkpoint.id)) {
@@ -79,6 +108,17 @@ for (const track of manifest.tracks ?? []) {
     if (!checkpoint.title || !checkpoint.evidence) {
       fail(`Checkpoint ${checkpoint.id} requires title and evidence.`);
     }
+    if (
+      checkpoint.evidence.startsWith("/") ||
+      checkpoint.evidence.includes("..") ||
+      !checkpoint.evidence.startsWith("learner-artifacts/")
+    ) {
+      fail(`Checkpoint ${checkpoint.id} has unsafe evidence path.`);
+    }
+    if (evidencePaths.has(checkpoint.evidence)) {
+      fail(`Duplicate checkpoint evidence path: ${checkpoint.evidence}`);
+    }
+    evidencePaths.add(checkpoint.evidence);
 
     const heading = `## ${checkpoint.id}:`;
     const start = content.indexOf(heading);
@@ -103,6 +143,34 @@ for (const track of manifest.tracks ?? []) {
     if (!section.includes(checkpoint.evidence)) {
       fail(
         `${checkpoint.id} does not name manifest evidence path ${checkpoint.evidence}`,
+      );
+    }
+    for (const skillName of checkpoint.practicedSkills ?? []) {
+      if (!(track.skills ?? []).includes(skillName)) {
+        fail(
+          `Checkpoint ${checkpoint.id} practices out-of-scope skill: ${skillName}`,
+        );
+      }
+      if (practicedSkills.has(skillName)) {
+        fail(
+          `Skill ${skillName} is practiced by both ${practicedSkills.get(skillName)} and ${checkpoint.id}`,
+        );
+      }
+      practicedSkills.set(skillName, checkpoint.id);
+      if (!section.includes(`\`${skillName}\``)) {
+        fail(
+          `Checkpoint ${checkpoint.id} does not name practiced skill \`${skillName}\``,
+        );
+      }
+    }
+  }
+
+  for (const skillName of track.skills ?? []) {
+    const isPracticed = practicedSkills.has(skillName);
+    const isReference = referenceSkills.has(skillName);
+    if (isPracticed === isReference) {
+      fail(
+        `Skill ${skillName} must be exactly one of practiced or reference-only.`,
       );
     }
   }
@@ -141,6 +209,31 @@ if (unknownCoverage.length > 0) {
   fail(`Course covers unknown skills: ${unknownCoverage.join(", ")}`);
 }
 
+const pinnedSkillNames = Object.keys(skillContracts.skills ?? {}).sort();
+if (
+  JSON.stringify(pinnedSkillNames) !== JSON.stringify(topLevelSkills)
+) {
+  const missingPins = topLevelSkills.filter(
+    (skillName) => !pinnedSkillNames.includes(skillName),
+  );
+  const stalePins = pinnedSkillNames.filter(
+    (skillName) => !topLevelSkills.includes(skillName),
+  );
+  if (missingPins.length > 0) {
+    fail(`Skills missing contract identity: ${missingPins.join(", ")}`);
+  }
+  if (stalePins.length > 0) {
+    fail(`Contract identities reference removed skills: ${stalePins.join(", ")}`);
+  }
+}
+for (const skillName of topLevelSkills) {
+  const skillPath = join(skillRoot, skillName, "SKILL.md");
+  const currentDigest = hashFile(skillPath);
+  if (skillContracts.skills?.[skillName] !== currentDigest) {
+    fail(`Skill contract changed without curriculum review: ${skillName}`);
+  }
+}
+
 for (const [alias, authority] of Object.entries(manifest.aliases ?? {})) {
   if (!coveredSkills.has(alias)) {
     fail(`Alias is not covered by a track: ${alias}`);
@@ -151,6 +244,22 @@ for (const [alias, authority] of Object.entries(manifest.aliases ?? {})) {
   if (alias === authority) {
     fail(`Alias cannot point to itself: ${alias}`);
   }
+  if (!referenceSkills.has(alias) || practicedSkills.has(alias)) {
+    fail(`Compatibility alias must be reference-only: ${alias}`);
+  }
+}
+
+const foundations = (manifest.tracks ?? []).filter(
+  (track) => track.kind === "foundation",
+);
+if (foundations.length !== 1) {
+  fail(`Course requires exactly one foundation track; found ${foundations.length}.`);
+}
+const capstones = (manifest.tracks ?? []).filter(
+  (track) => track.kind === "capstone",
+);
+if (capstones.length !== 1) {
+  fail(`Course requires exactly one capstone track; found ${capstones.length}.`);
 }
 
 finish();
@@ -170,5 +279,11 @@ function finish() {
   console.log(`Tracks: ${manifest.tracks.length}`);
   console.log(`Checkpoints: ${checkpointCount}`);
   console.log(`Covered skills: ${coveredSkills.size}`);
+  console.log(`Practiced skills: ${practicedSkills.size}`);
+  console.log(`Reference-only skills: ${referenceSkills.size}`);
   console.log("Course structure is valid.");
+}
+
+function hashFile(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
 }

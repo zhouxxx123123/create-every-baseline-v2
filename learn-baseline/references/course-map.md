@@ -33,6 +33,7 @@ Read [track-foundation.md](track-foundation.md) only while this track is active.
 | Create or maintain reusable skills | `skill-authoring` | A validated skill design and routing audit |
 
 The learner can complete more than one elective. Switching tracks preserves progress.
+A route completion covers one elective; full-catalog completion requires all five.
 
 ## Capstone eligibility
 
@@ -42,16 +43,19 @@ Require:
 - at least one elective complete;
 - a fresh scenario not already solved in a track artifact.
 
-Adapt the capstone:
+Use the matching built-in scenario:
 
-- product route: decide, validate, and preserve a canonical return path;
-- delivery route: verify readiness, slice work, and define implementation evidence;
-- maintenance route: build a feedback loop, repair, and review;
-- authoring route: create or revise a skill and prove registry integrity.
+- product discovery: `requests/capstone-product-scenario.md`;
+- evidence validation: `requests/capstone-evidence-scenario.md`;
+- delivery: `requests/capstone-delivery-scenario.md`;
+- engineering maintenance: `requests/capstone-maintenance-scenario.md`;
+- skill authoring: `requests/capstone-authoring-scenario.md`.
 
 ## Skill coverage
 
-The manifest maps every top-level skill in this repository to one teaching track. Compatibility aliases are reference-only:
+The manifest maps every top-level skill in this repository to one teaching track and
+distinguishes hands-on `practicedSkills` from recognition-only `referenceSkills`.
+Compatibility aliases are reference-only:
 
 | Alias | Authority |
 | --- | --- |
@@ -60,6 +64,12 @@ The manifest maps every top-level skill in this repository to one teaching track
 | `to-issues` | `to-tickets` |
 
 `grill-me` and `grill-with-docs` are distinct compositions around `grilling`, not compatibility aliases.
+
+Course reports must state these levels separately:
+
+- **practiced**: the learner invoked the Skill and produced inspected evidence;
+- **reference-only**: the learner can identify its role or compatibility boundary;
+- **unpracticed**: the learner has not completed the owning track.
 
 ## Reference route
 

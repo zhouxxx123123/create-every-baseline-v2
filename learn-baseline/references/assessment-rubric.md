@@ -24,9 +24,29 @@ A track passes when:
 
 The capstone passes at 12 of 15 with no worked-recovery help on its final two checkpoints.
 
+## Track-specific proof
+
+The five scores are shared, but each track must also demonstrate its own non-negotiable
+proof. A high generic score cannot compensate for a missing track-specific result.
+
+| Track | Required proof before assessment |
+| --- | --- |
+| `foundation` | Correctly routes every scenario, identifies repository authority, and preserves one exact resume target |
+| `product-discovery` | Keeps terms, facts, assumptions, and user-owned decisions separate; records exactly one active frontier |
+| `evidence-validation` | Routes research, prototype, spike, and product decision to distinct evidence and returns each detour to an owner |
+| `delivery` | Uses a current bounded receipt, preserves one-owner requirement traceability, produces a red-green result, and reports review findings before summary |
+| `engineering-maintenance` | Produces a specific red signal, avoids destructive conflict recovery, and does not turn triage or architecture analysis into unapproved implementation |
+| `skill-authoring` | Produces a valid invocation contract, validates an actual draft, tests deterministic scripts, and audits stale names |
+| `capstone` | Executes a fresh route, preserves stop conditions, repairs one material weakness, and teaches the causal workflow back |
+
+If any required proof is missing, keep the track incomplete even when the numeric total
+would otherwise pass.
+
 ## Feedback record
 
-At track completion, append a concise section to the learner's `learning-journal.md`:
+Before running `course.mjs assess`, write a stable assessment artifact at
+`learner-artifacts/<track>-assessment.md`. A short summary may also be appended to
+`learning-journal.md`, but the per-track artifact is the immutable assessment record:
 
 ```markdown
 ## <track> assessment

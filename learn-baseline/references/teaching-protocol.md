@@ -16,7 +16,7 @@ ORIENT -> EXPLAIN -> DEMO -> DO -> CHECK
 - **CHECK**: stop and inspect the resulting command output, file, explanation, or decision.
 - **FEEDBACK**: compare observed evidence with the checkpoint criterion. Name one strength and the highest-value correction.
 - **REFLECT**: ask the learner to explain the routing or tradeoff in their own words when transfer matters.
-- **SAVE**: record completion only after the required evidence exists and passes.
+- **SAVE**: submit evidence first, then record acceptance only after an explicit review passes.
 - **NEXT**: offer one next checkpoint, not the rest of the course.
 
 ## Turn contract
@@ -41,11 +41,13 @@ Do not expose labels such as `SAY` or `CHECK` to the learner as script mechanics
 Accept evidence only when:
 
 1. it is produced by the learner or by a tool they explicitly operated;
-2. it exists at the manifest path or another explicitly recorded path inside the course workspace;
+2. it exists at the unique manifest path inside the course workspace;
 3. it demonstrates the checkpoint capability rather than merely repeating course wording;
 4. it passes the checkpoint's `Advance when` criterion.
 
-An acknowledgement, copied model answer, or uninspected file is not sufficient.
+An acknowledgement, copied model answer, uninspected file, or successful `submit`
+command is not sufficient. Submission proves that an artifact exists; `review pass`
+records that its content met the checkpoint criterion.
 
 ## Hint ladder
 
@@ -95,7 +97,10 @@ Reference mode does not alter progress. A learner may pause or switch elective t
 
 ## Assessment
 
-Use [assessment-rubric.md](assessment-rubric.md) after the final checkpoint in a track. Build quizzes from what the learner actually did, not from unseen course text. Quiz performance may guide review but cannot replace required practice evidence.
+Use [assessment-rubric.md](assessment-rubric.md) after the final checkpoint in a track.
+The track remains incomplete until `course.mjs assess` records a passing score. Build
+quizzes from what the learner actually did, not from unseen course text. Quiz
+performance may guide review but cannot replace accepted practice evidence.
 
 ## Course updates
 
@@ -103,8 +108,9 @@ Run `doctor` before resuming. When the installed course version differs from pro
 
 1. explain that the curriculum changed;
 2. run `migrate`;
-3. preserve evidence for checkpoint IDs that still exist;
-4. retain retired checkpoint history;
-5. route the learner to the first newly incomplete requirement.
+3. preserve submitted evidence for checkpoint IDs that still exist;
+4. preserve acceptance only when the checkpoint requirement digest still matches;
+5. retain retired checkpoint and assessment history;
+6. route the learner to the first newly incomplete requirement.
 
 Never silently mark a new checkpoint complete from an old track-level completion.

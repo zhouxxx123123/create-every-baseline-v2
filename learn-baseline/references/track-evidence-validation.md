@@ -8,6 +8,8 @@ Teach the learner to choose evidence by uncertainty type and return the result t
 
 **Concept:** Research finds reliable facts, prototypes reveal observable behavior, technical spikes test feasibility, and grilling resolves product choices. Evidence cannot decide user-owned preferences.
 
+**Skill practice:** Routing exercise only; later checkpoints perform the actual `research`, `prototype`, `technical-spike`, and `product-readiness` workflows.
+
 **Learner action:** Read `requests/evidence-scenarios.md`. Create `learner-artifacts/evidence-routing.md` with uncertainty, selected route, why the other three routes are wrong, expected evidence, and return target.
 
 **Evidence:** `learner-artifacts/evidence-routing.md`
@@ -26,7 +28,9 @@ Teach the learner to choose evidence by uncertainty type and return the result t
 
 **Concept:** A research contract states one question, source authority, comparison dimensions, exclusions, output artifact, and the decision it informs.
 
-**Learner action:** Use `requests/research-question.md`. Create `learner-artifacts/evidence-research-brief.md` containing originating workflow, current confirmed facts, one research question, primary-source requirements, comparison table, evidence limitations, output path, and resume target.
+**Skill practice:** Invoke `research` for a bounded, read-only primary-source check and preserve the originating workflow.
+
+**Learner action:** Use `requests/research-question.md`. Invoke `research` to produce a small source-backed result, then create `learner-artifacts/evidence-research-brief.md` containing originating workflow, current confirmed facts, one research question, primary-source requirements, comparison table, evidence limitations, output path, result link, and resume target.
 
 **Evidence:** `learner-artifacts/evidence-research-brief.md`
 
@@ -44,7 +48,9 @@ Teach the learner to choose evidence by uncertainty type and return the result t
 
 **Concept:** A prototype validates a bounded experience against named states or interactions. A technical spike runs the smallest experiment that can return feasible, infeasible, or inconclusive.
 
-**Learner action:** Read `requests/prototype-question.md` and `requests/technical-uncertainty.md`. Create `learner-artifacts/evidence-validation-contracts.md` with one prototype contract and one spike contract. Give each an origin, exact question, admitted evidence, stop condition, exclusions, and return target.
+**Skill practice:** Invoke `prototype` for a disposable local artifact and `technical-spike` for a minimal safe experiment; neither may decide the product answer.
+
+**Learner action:** Read `requests/prototype-question.md` and `requests/technical-uncertainty.md`. Invoke both bounded workflows in the lab, then create `learner-artifacts/evidence-validation-contracts.md` linking the prototype and spike evidence. Give each an origin, exact question, admitted evidence, stop condition, exclusions, result, and return target.
 
 **Evidence:** `learner-artifacts/evidence-validation-contracts.md`
 
@@ -62,7 +68,9 @@ Teach the learner to choose evidence by uncertainty type and return the result t
 
 **Concept:** Product readiness checks current canonical decisions, deferred coverage, material evidence, contradictions, and a persistable receipt. It does not require deployment or implementation contracts.
 
-**Learner action:** Review the fixture baseline and the artifacts from this track. Create `learner-artifacts/evidence-readiness-assessment.md` with target, specification boundary, canonical sources, current blocker, deferred coverage, one next skill when blocked, verdict, receipt status, and reason.
+**Skill practice:** Invoke `product-readiness` against one bounded target and stop at its verdict.
+
+**Learner action:** Review the fixture baseline and the artifacts from this track. Invoke `product-readiness`, then create `learner-artifacts/evidence-readiness-assessment.md` with target, specification boundary, canonical sources, current blocker, deferred coverage, one next skill when blocked, verdict, receipt status, and reason.
 
 **Evidence:** `learner-artifacts/evidence-readiness-assessment.md`
 

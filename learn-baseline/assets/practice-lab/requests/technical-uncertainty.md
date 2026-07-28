@@ -1,11 +1,15 @@
 # Technical Uncertainty Seed
 
-A future desktop integration may upload a local review attachment. The product principle requires the operation to stop safely if operating-system permission is revoked.
+A future local importer may process a file in asynchronous chunks. The product
+principle requires the operation to stop before the final success write when its
+`AbortSignal` is triggered.
 
 Unknown:
 
-- whether the platform API exposes a reliable stop boundary;
-- whether a verified partial upload can resume;
-- whether a failed stop can leave a misleading completed result.
+- whether the current Node runtime observes abort between two simulated chunks;
+- whether a completed chunk can be recorded without writing the final success state;
+- whether an abort racing with the final chunk can leave a misleading completed result.
 
-The experiment must not implement the production upload feature or redefine the product principle.
+Run a disposable experiment with fake in-memory chunks and deterministic timing. The
+experiment must not read real files, implement the production importer, or redefine
+the product principle.

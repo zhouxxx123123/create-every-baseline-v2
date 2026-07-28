@@ -8,7 +8,9 @@ Teach the learner to separate domain language from product choices, resolve one 
 
 **Concept:** Terms define stable meaning, facts come from authority or evidence, decisions belong to the user, and unresolved questions remain routed work.
 
-**Learner action:** Read `CONTEXT.md`, `docs/product/product-baseline.md`, and `requests/feature-request.md`. Create `learner-artifacts/product-domain-model.md` with four sections: stable terms, confirmed facts, assumptions, and decisions still required. Add one object relationship diagram.
+**Skill practice:** Invoke `domain-modeling` against the lab's canonical context and preserve its authority boundaries.
+
+**Learner action:** Read `CONTEXT.md`, `docs/product/product-baseline.md`, and `requests/feature-request.md`. Invoke `domain-modeling`, then create `learner-artifacts/product-domain-model.md` with four sections: stable terms, confirmed facts, assumptions, and decisions still required. Add one object relationship diagram.
 
 **Evidence:** `learner-artifacts/product-domain-model.md`
 
@@ -26,7 +28,9 @@ Teach the learner to separate domain language from product choices, resolve one 
 
 **Concept:** Explain the scenario and tradeoff, recommend one direction, ask one question, wait, and record only the answer actually confirmed.
 
-**Learner action:** Choose the most foundational unresolved question from `product-domain-model.md`. Write `learner-artifacts/product-decision.md` with scenario, options, recommendation, the single question, a simulated learner answer, exact confirmed boundary, exclusions classified by meaning, and remaining owner.
+**Skill practice:** Invoke `grilling` for one simulated decision turn. Treat `grill-me` and `grill-with-docs` as composition variants, not additional mastered skills.
+
+**Learner action:** Choose the most foundational unresolved question from `product-domain-model.md`. Invoke `grilling` for one question and simulated answer, then write `learner-artifacts/product-decision.md` with scenario, options, recommendation, the single question, exact confirmed boundary, exclusions classified by meaning, and remaining owner.
 
 **Evidence:** `learner-artifacts/product-decision.md`
 
@@ -44,7 +48,9 @@ Teach the learner to separate domain language from product choices, resolve one 
 
 **Concept:** Wayfinder charts unresolved decisions and dependencies. The map is an index; each canonical ticket owns its answer. One active frontier identifies the current decision.
 
-**Learner action:** Treat the full feature request as too large for one session. Create `learner-artifacts/product-wayfinder-map.md` with destination, decision tickets, blocker edges, canonical owner for each answer, one active frontier, and a stop condition that hands off to readiness rather than implementation.
+**Skill practice:** Invoke `wayfinder` in the lab and keep its map separate from canonical decision answers.
+
+**Learner action:** Treat the full feature request as too large for one session. Invoke `wayfinder`, then create `learner-artifacts/product-wayfinder-map.md` with destination, decision tickets, blocker edges, canonical owner for each answer, one active frontier, and a stop condition that hands off to readiness rather than implementation.
 
 **Evidence:** `learner-artifacts/product-wayfinder-map.md`
 
@@ -62,7 +68,9 @@ Teach the learner to separate domain language from product choices, resolve one 
 
 **Concept:** `pre-prd-hardening` freezes context, splits uncertainties, and routes missing evidence before the final bounded readiness gate.
 
-**Learner action:** Select one bounded target from the map. Create `learner-artifacts/product-hardening-review.md` covering canonical sources, stable decisions, unresolved product questions, evidence detours, cross-functional handoffs, exclusions, and the exact target to send to `product-readiness`.
+**Skill practice:** Invoke `pre-prd-hardening` on one bounded target rather than the whole fictional product.
+
+**Learner action:** Select one bounded target from the map. Invoke `pre-prd-hardening`, then create `learner-artifacts/product-hardening-review.md` covering canonical sources, stable decisions, unresolved product questions, evidence detours, cross-functional handoffs, exclusions, and the exact target to send to `product-readiness`.
 
 **Evidence:** `learner-artifacts/product-hardening-review.md`
 

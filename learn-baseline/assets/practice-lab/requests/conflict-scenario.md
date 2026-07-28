@@ -1,18 +1,18 @@
 # Merge Conflict Scenario
 
-A rebase is paused with one conflict in `src/task-store.mjs`.
+Run:
 
-The current branch:
+```bash
+node scripts/prepare-conflict.mjs
+```
 
-- validates names before assigning them;
-- returns `{ ok: false, reason: "empty-name" }` for an empty rename.
+This creates an isolated nested Git repository at `conflict-lab/` and pauses a merge
+with one conflict in `task-store.mjs`. It does not use or modify the outer course
+workspace's Git history.
 
-The rebased commit:
+Inspect the active operation, both branch histories, and the conflicting hunk. Recover
+both intended behaviors when they are compatible; if they are not, explain the
+authority needed to choose. Run validation before completing the merge.
 
-- introduces `normalizeTaskName(name)` to collapse repeated spaces;
-- uses it from both `add` and `rename`;
-- changes the not-found result shape consistently.
-
-There are unrelated uncommitted notes in `learner-artifacts/` that must be preserved.
-
-Plan a semantic merge that retains pre-mutation validation, shared normalization, and the new result shape. Do not run destructive Git commands in this exercise.
+Do not run destructive reset or checkout commands. Do not stage or commit anything in
+the outer course workspace.

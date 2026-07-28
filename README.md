@@ -81,7 +81,7 @@ $technical-spike
 $skill-router
 ```
 
-想通过互动练习系统学习整套工作流时，调用：
+想通过互动练习学习一条完整工作流路线时，调用：
 
 ```text
 $learn-baseline
@@ -190,7 +190,7 @@ $learn-baseline
 
 | Skill | 用途 |
 | --- | --- |
-| `learn-baseline` | 通过诊断分流、互动 checkpoint、安全练习仓库和跨会话进度学习整套 Skill 工作流 |
+| `learn-baseline` | 通过提交、教师验收、Track 评分和分路线 Capstone，在安全练习仓库中学习 Skill 工作流 |
 | `write-a-skill` | 创建具有标准目录、渐进披露和配套资源的新 Skill |
 | `writing-great-skills` | 编写可预测 Skill 的原则、术语和审查参考 |
 | `agent-reach` | 调用外部工具搜索和读取多个互联网平台 |
@@ -345,7 +345,9 @@ node learn-baseline/scripts/validate-course.mjs
 node --test learn-baseline/scripts/test-course.mjs
 ```
 
-课程校验要求每个现有 Skill 恰好进入一个教学路线，并检查 checkpoint ID、证据路径、课程文件和兼容别名。新增或重命名 Skill 后，课程覆盖检查会失败，直到课程地图同步更新。
+课程校验要求除 `learn-baseline` 自身外的每个现有 Skill 恰好进入一个教学路线，并明确区分实际操作和仅供识别的参考覆盖。它还会检查 checkpoint ID、证据路径、课程文件、兼容别名及每个 `SKILL.md` 的内容身份。新增、重命名或实质修改 Skill 后，课程检查会失败，直到课程内容完成复核。
+
+`learn-baseline` 不会仅因作业文件存在就判定通过。证据需要先提交，再由教师记录 `pass` 或 `retry`；一条 Track 的全部 checkpoint 被接受后，还必须通过正式评分。完成 Foundation、一条 Elective 和对应 Capstone 只代表完成该路线；只有完成全部 Elective 才能称为完整目录覆盖。
 
 ## 移除或重命名 Skill
 

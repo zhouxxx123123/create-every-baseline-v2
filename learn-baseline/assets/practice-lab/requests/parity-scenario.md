@@ -1,10 +1,15 @@
 # Prototype Parity Scenario
 
-A reviewed prototype for failed Task rename admits these visible states:
+Approved source:
 
-- the original name remains visible;
-- the edit control remains available;
-- an inline failure explanation appears;
-- no success confirmation appears.
+- identity: `harbor-rename-failure-v1`;
+- artifact: `prototype/approved-task-rename.html`;
+- fixture: Task `T-104`, original name `Prepare review`.
 
-The implementation tests only the `TaskStore.rename` result. The learner must define what live evidence is still needed before visible parity can be declared.
+Implemented local surface:
+
+- artifact: `app/task-rename-live.html`;
+- same fixture identity.
+
+Render or inspect both artifacts, capture observable evidence, and classify each gap.
+These files are a course simulation, not an approved production prototype.

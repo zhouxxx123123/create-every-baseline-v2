@@ -1,8 +1,9 @@
 {
   "schemaVersion": 1,
   "courseId": "learn-baseline",
-  "courseVersion": "1.0.0",
-  "defaultLocale": "zh-CN",
+  "courseVersion": "1.1.0",
+  "defaultLocale": "auto",
+  "skillContractsFile": "references/skill-contracts.json",
   "tracks": [
     {
       "id": "foundation",
@@ -19,26 +20,42 @@
         "caveman",
         "zoom-out"
       ],
+      "referenceSkills": [
+        "agent-reach",
+        "teach",
+        "caveman",
+        "zoom-out"
+      ],
       "checkpoints": [
         {
           "id": "FND-01",
           "title": "Route requests by outcome",
-          "evidence": "learner-artifacts/foundation-routing.md"
+          "evidence": "learner-artifacts/foundation-routing.md",
+          "practicedSkills": [
+            "skill-router"
+          ]
         },
         {
           "id": "FND-02",
           "title": "Establish repository authority",
-          "evidence": "learner-artifacts/foundation-setup-review.md"
+          "evidence": "learner-artifacts/foundation-setup-review.md",
+          "practicedSkills": [
+            "start-setup"
+          ]
         },
         {
           "id": "FND-03",
           "title": "Preserve a cross-session return path",
-          "evidence": "learner-artifacts/foundation-handoff.md"
+          "evidence": "learner-artifacts/foundation-handoff.md",
+          "practicedSkills": [
+            "handoff"
+          ]
         },
         {
           "id": "FND-04",
           "title": "Use standalone tools without confusing the main flow",
-          "evidence": "learner-artifacts/foundation-standalone-tools.md"
+          "evidence": "learner-artifacts/foundation-standalone-tools.md",
+          "practicedSkills": []
         }
       ]
     },
@@ -58,26 +75,42 @@
         "wayfinder",
         "pre-prd-hardening"
       ],
+      "referenceSkills": [
+        "grill-me",
+        "grill-with-docs"
+      ],
       "checkpoints": [
         {
           "id": "PD-01",
           "title": "Separate terms, facts, and decisions",
-          "evidence": "learner-artifacts/product-domain-model.md"
+          "evidence": "learner-artifacts/product-domain-model.md",
+          "practicedSkills": [
+            "domain-modeling"
+          ]
         },
         {
           "id": "PD-02",
           "title": "Resolve one product question",
-          "evidence": "learner-artifacts/product-decision.md"
+          "evidence": "learner-artifacts/product-decision.md",
+          "practicedSkills": [
+            "grilling"
+          ]
         },
         {
           "id": "PD-03",
           "title": "Create a decision map and frontier",
-          "evidence": "learner-artifacts/product-wayfinder-map.md"
+          "evidence": "learner-artifacts/product-wayfinder-map.md",
+          "practicedSkills": [
+            "wayfinder"
+          ]
         },
         {
           "id": "PD-04",
           "title": "Harden a bounded target",
-          "evidence": "learner-artifacts/product-hardening-review.md"
+          "evidence": "learner-artifacts/product-hardening-review.md",
+          "practicedSkills": [
+            "pre-prd-hardening"
+          ]
         }
       ]
     },
@@ -95,26 +128,38 @@
         "technical-spike",
         "product-readiness"
       ],
+      "referenceSkills": [],
       "checkpoints": [
         {
           "id": "EV-01",
           "title": "Classify the uncertainty",
-          "evidence": "learner-artifacts/evidence-routing.md"
+          "evidence": "learner-artifacts/evidence-routing.md",
+          "practicedSkills": []
         },
         {
           "id": "EV-02",
           "title": "Write a bounded research contract",
-          "evidence": "learner-artifacts/evidence-research-brief.md"
+          "evidence": "learner-artifacts/evidence-research-brief.md",
+          "practicedSkills": [
+            "research"
+          ]
         },
         {
           "id": "EV-03",
           "title": "Define prototype and spike contracts",
-          "evidence": "learner-artifacts/evidence-validation-contracts.md"
+          "evidence": "learner-artifacts/evidence-validation-contracts.md",
+          "practicedSkills": [
+            "prototype",
+            "technical-spike"
+          ]
         },
         {
           "id": "EV-04",
           "title": "Apply the readiness gate",
-          "evidence": "learner-artifacts/evidence-readiness-assessment.md"
+          "evidence": "learner-artifacts/evidence-readiness-assessment.md",
+          "practicedSkills": [
+            "product-readiness"
+          ]
         }
       ]
     },
@@ -137,31 +182,52 @@
         "code-review",
         "prototype-parity-check"
       ],
+      "referenceSkills": [
+        "to-prd",
+        "to-issues"
+      ],
       "checkpoints": [
         {
           "id": "DL-01",
           "title": "Verify the specification boundary",
-          "evidence": "learner-artifacts/delivery-spec-boundary.md"
+          "evidence": "learner-artifacts/delivery-spec-boundary.md",
+          "practicedSkills": [
+            "to-spec"
+          ]
         },
         {
           "id": "DL-02",
           "title": "Design a tracer-bullet ticket plan",
-          "evidence": "learner-artifacts/delivery-ticket-plan.md"
+          "evidence": "learner-artifacts/delivery-ticket-plan.md",
+          "practicedSkills": [
+            "to-tickets"
+          ]
         },
         {
           "id": "DL-03",
           "title": "Write an implementation contract",
-          "evidence": "learner-artifacts/delivery-implementation-contract.md"
+          "evidence": "learner-artifacts/delivery-implementation-contract.md",
+          "practicedSkills": [
+            "prd-implementation-precheck"
+          ]
         },
         {
           "id": "DL-04",
           "title": "Choose seams and review a change",
-          "evidence": "learner-artifacts/delivery-test-review.md"
+          "evidence": "learner-artifacts/delivery-test-review.md",
+          "practicedSkills": [
+            "implement",
+            "tdd",
+            "code-review"
+          ]
         },
         {
           "id": "DL-05",
           "title": "Close visible work against prototype evidence",
-          "evidence": "learner-artifacts/delivery-parity-closeout.md"
+          "evidence": "learner-artifacts/delivery-parity-closeout.md",
+          "practicedSkills": [
+            "prototype-parity-check"
+          ]
         }
       ]
     },
@@ -181,26 +247,42 @@
         "improve-codebase-architecture",
         "triage"
       ],
+      "referenceSkills": [
+        "diagnose"
+      ],
       "checkpoints": [
         {
           "id": "EM-01",
           "title": "Build a red feedback loop",
-          "evidence": "learner-artifacts/maintenance-bug-loop.md"
+          "evidence": "learner-artifacts/maintenance-bug-loop.md",
+          "practicedSkills": [
+            "diagnosing-bugs"
+          ]
         },
         {
           "id": "EM-02",
           "title": "Identify a deepening opportunity",
-          "evidence": "learner-artifacts/maintenance-architecture.md"
+          "evidence": "learner-artifacts/maintenance-architecture.md",
+          "practicedSkills": [
+            "codebase-design",
+            "improve-codebase-architecture"
+          ]
         },
         {
           "id": "EM-03",
           "title": "Triage a raw request",
-          "evidence": "learner-artifacts/maintenance-triage.md"
+          "evidence": "learner-artifacts/maintenance-triage.md",
+          "practicedSkills": [
+            "triage"
+          ]
         },
         {
           "id": "EM-04",
-          "title": "Plan a non-destructive conflict recovery",
-          "evidence": "learner-artifacts/maintenance-conflict-recovery.md"
+          "title": "Resolve an isolated merge conflict safely",
+          "evidence": "learner-artifacts/maintenance-conflict-recovery.md",
+          "practicedSkills": [
+            "resolving-merge-conflicts"
+          ]
         }
       ]
     },
@@ -216,26 +298,35 @@
         "write-a-skill",
         "writing-great-skills"
       ],
+      "referenceSkills": [],
       "checkpoints": [
         {
           "id": "SA-01",
           "title": "Design the invocation contract",
-          "evidence": "learner-artifacts/authoring-invocation-contract.md"
+          "evidence": "learner-artifacts/authoring-invocation-contract.md",
+          "practicedSkills": [
+            "writing-great-skills"
+          ]
         },
         {
           "id": "SA-02",
           "title": "Place steps, references, scripts, and assets",
-          "evidence": "learner-artifacts/authoring-skill-plan.md"
+          "evidence": "learner-artifacts/authoring-skill-plan.md",
+          "practicedSkills": []
         },
         {
           "id": "SA-03",
           "title": "Validate a draft skill",
-          "evidence": "learner-artifacts/authoring-validation.md"
+          "evidence": "learner-artifacts/authoring-validation.md",
+          "practicedSkills": [
+            "write-a-skill"
+          ]
         },
         {
           "id": "SA-04",
           "title": "Update routing without stale names",
-          "evidence": "learner-artifacts/authoring-routing-audit.md"
+          "evidence": "learner-artifacts/authoring-routing-audit.md",
+          "practicedSkills": []
         }
       ]
     },
@@ -248,31 +339,37 @@
         "foundation"
       ],
       "skills": [],
+      "referenceSkills": [],
       "checkpoints": [
         {
           "id": "CP-01",
           "title": "Select and bound a fresh scenario",
-          "evidence": "learner-artifacts/capstone-brief.md"
+          "evidence": "learner-artifacts/capstone-brief.md",
+          "practicedSkills": []
         },
         {
           "id": "CP-02",
           "title": "Design the route and stop conditions",
-          "evidence": "learner-artifacts/capstone-route.md"
+          "evidence": "learner-artifacts/capstone-route.md",
+          "practicedSkills": []
         },
         {
           "id": "CP-03",
           "title": "Execute the route",
-          "evidence": "learner-artifacts/capstone-execution.md"
+          "evidence": "learner-artifacts/capstone-execution.md",
+          "practicedSkills": []
         },
         {
           "id": "CP-04",
           "title": "Review evidence and repair one weakness",
-          "evidence": "learner-artifacts/capstone-review.md"
+          "evidence": "learner-artifacts/capstone-review.md",
+          "practicedSkills": []
         },
         {
           "id": "CP-05",
           "title": "Teach back the workflow",
-          "evidence": "learner-artifacts/capstone-teachback.md"
+          "evidence": "learner-artifacts/capstone-teachback.md",
+          "practicedSkills": []
         }
       ]
     }

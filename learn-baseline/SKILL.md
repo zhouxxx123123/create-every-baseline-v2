@@ -34,14 +34,33 @@ For every turn:
 4. State the observable evidence that will prove completion.
 5. Stop and wait.
 6. Inspect the actual result, give specific feedback, and require a retry when the criterion is not met.
-7. After the evidence file exists, record it:
+7. After the evidence file exists, submit it without advancing:
 
    ```bash
-   node "<skill-dir>/scripts/course.mjs" checkpoint \
+   node "<skill-dir>/scripts/course.mjs" submit \
      "<workspace>" "<checkpoint-id>" "<evidence-path>"
    ```
 
-8. Run `status`, recap the demonstrated capability, and offer the single next checkpoint.
+8. Inspect the submitted artifact against `Advance when`. Record a specific review:
+
+   ```bash
+   node "<skill-dir>/scripts/course.mjs" review \
+     "<workspace>" "<checkpoint-id>" <pass|retry> \
+     --hint <none|prompt|structure|adjacent-example|worked-recovery> \
+     --feedback "<observed strength or correction>"
+   ```
+
+9. A `retry` keeps the same checkpoint active. A `pass` accepts the checkpoint and unlocks the next one.
+10. After every checkpoint in a track is accepted, read the track-specific rubric criteria and run the five-dimension assessment:
+
+   ```bash
+   node "<skill-dir>/scripts/course.mjs" assess \
+     "<workspace>" "<track-id>" "<routing,boundary,evidence,return,independence>" \
+     --record "<workspace>/learner-artifacts/<track-id>-assessment.md" \
+     --feedback "<evidence-based track assessment>"
+   ```
+
+11. Run `status`, recap the demonstrated capability, and offer the single next checkpoint.
 
 An acknowledgement such as "done" or "understood" is not evidence when the checkpoint requires an artifact or observable action.
 
@@ -58,13 +77,14 @@ An acknowledgement such as "done" or "understood" is not evidence when the check
 
 - Read [progress-schema.md](references/progress-schema.md) when initializing, migrating, or repairing progress.
 - Read [assessment-rubric.md](references/assessment-rubric.md) before evaluating a track or capstone.
+- Treat manifest `practicedSkills` as hands-on obligations and `referenceSkills` as recognition-only coverage. Never describe reference-only exposure as practiced competence.
 - Load exactly one of the track files named in the course manifest for the active checkpoint.
 - The practice repository is in `assets/practice-lab/`; `init` copies it into the learner workspace.
 
 ## Guardrails
 
 - Practice in the dedicated lab by default. Touch a real project only after the learner explicitly chooses transfer practice and confirms the scope.
-- Keep Issue Tracker, GitHub, deployment, account, and production writes simulated unless the learner explicitly requests the real action and the invoked skill permits it.
+- Keep external Issue Tracker, GitHub, deployment, account, and production writes simulated unless the learner explicitly requests the real action and the invoked skill permits it. Local Markdown tracker and local Git exercises inside the dedicated lab are allowed after the checkpoint's confirmation gate.
 - Teach canonical skills; explain compatibility aliases in reference mode instead of assigning duplicate lessons.
 - Match the learner's language. Keep skill names, checkpoint IDs, commands, and file paths exact.
 - Answer deviations naturally, then return to the persisted checkpoint.
@@ -72,4 +92,4 @@ An acknowledgement such as "done" or "understood" is not evidence when the check
 
 ## Completion
 
-A track is complete only when all of its manifest checkpoints have evidence and pass the rubric. The course is complete when the foundation, at least one elective track, and a capstone variant are complete. Report demonstrated capabilities and remaining tracks separately; never equate course completion with mastery of every skill.
+A track is complete only when every checkpoint has accepted evidence and the track assessment passes. The course is complete when the foundation, at least one elective track, and a matching capstone variant pass. Full-catalog completion requires every elective; route completion does not. Report practiced, reference-only, and remaining skills separately.

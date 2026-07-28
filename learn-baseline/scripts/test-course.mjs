@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   mkdtempSync,
   mkdirSync,
@@ -32,6 +33,8 @@ test("validates course coverage and checkpoint structure", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Course structure is valid/);
   assert.match(result.stdout, /Covered skills: 34/);
+  assert.match(result.stdout, /Practiced skills: 25/);
+  assert.match(result.stdout, /Reference-only skills: 9/);
 });
 
 test("preserves the intentional failed-rename mutation for diagnosis practice", () => {
@@ -42,6 +45,22 @@ test("preserves the intentional failed-rename mutation for diagnosis practice", 
 
   assert.deepEqual(result, { ok: false, reason: "empty-name" });
   assert.equal(store.get(task.id).name, "");
+});
+
+test("prepares a real merge conflict inside an isolated nested repository", () => {
+  const workspace = initializedWorkspace();
+  const prepareScript = join(workspace, "scripts", "prepare-conflict.mjs");
+
+  const prepared = runNode(prepareScript);
+  assertSuccess(prepared);
+  assert.match(prepared.stdout, /Isolated conflict ready/);
+
+  const status = spawnSync("git", ["status", "--short"], {
+    cwd: join(workspace, "conflict-lab"),
+    encoding: "utf8",
+  });
+  assertSuccess(status);
+  assert.match(status.stdout, /UU task-store\.mjs/);
 });
 
 test("initializes a dedicated lab and reports healthy progress", () => {
@@ -77,7 +96,7 @@ test("enforces checkpoint order and evidence containment", () => {
   writeFileSync(secondEvidence, "# Setup review\n");
 
   const skipped = runCourse(
-    "checkpoint",
+    "submit",
     workspace,
     "FND-02",
     secondEvidence,
@@ -88,16 +107,78 @@ test("enforces checkpoint order and evidence containment", () => {
   const outside = join(dirname(workspace), "outside.md");
   writeFileSync(outside, "# Outside\n");
   const escaped = runCourse(
-    "checkpoint",
+    "submit",
     workspace,
     "FND-01",
     outside,
   );
   assert.notEqual(escaped.status, 0);
   assert.match(escaped.stderr, /escapes course workspace/);
+
+  const wrongEvidence = join(artifactDirectory, "wrong-file.md");
+  writeFileSync(wrongEvidence, "# Wrong path\n");
+  const wrongPath = runCourse(
+    "submit",
+    workspace,
+    "FND-01",
+    wrongEvidence,
+  );
+  assert.notEqual(wrongPath.status, 0);
+  assert.match(wrongPath.stderr, /must use learner-artifacts\/foundation-routing.md/);
 });
 
-test("unlocks electives after completing foundation", () => {
+test("requires resubmission after a retry review", () => {
+  const workspace = initializedWorkspace();
+  const evidence = join(
+    workspace,
+    "learner-artifacts",
+    "foundation-routing.md",
+  );
+  writeFileSync(evidence, "# First attempt\n");
+  assertSuccess(runCourse("submit", workspace, "FND-01", evidence));
+  assertSuccess(
+    runCourse(
+      "review",
+      workspace,
+      "FND-01",
+      "retry",
+      "--hint",
+      "prompt",
+      "--feedback",
+      "The route is missing an observable stop condition.",
+    ),
+  );
+
+  const secondReview = runCourse(
+    "review",
+    workspace,
+    "FND-01",
+    "pass",
+    "--hint",
+    "none",
+    "--feedback",
+    "Attempted to pass without a revised submission.",
+  );
+  assert.notEqual(secondReview.status, 0);
+  assert.match(secondReview.stderr, /must be resubmitted/);
+
+  writeFileSync(evidence, "# Revised attempt\n\nIncludes a stop condition.\n");
+  assertSuccess(runCourse("submit", workspace, "FND-01", evidence));
+  assertSuccess(
+    runCourse(
+      "review",
+      workspace,
+      "FND-01",
+      "pass",
+      "--hint",
+      "prompt",
+      "--feedback",
+      "The revised artifact now includes the missing stop condition.",
+    ),
+  );
+});
+
+test("requires accepted checkpoints and a passing assessment before unlocking electives", () => {
   const workspace = initializedWorkspace();
   const earlyRoute = runCourse("route", workspace, "product-discovery");
   assert.notEqual(earlyRoute.status, 0);
@@ -112,13 +193,108 @@ test("unlocks electives after completing foundation", () => {
   for (const [checkpoint, file] of checkpoints) {
     const evidence = join(workspace, "learner-artifacts", file);
     writeFileSync(evidence, `# ${checkpoint}\n`);
-    assertSuccess(runCourse("checkpoint", workspace, checkpoint, evidence));
+    assertSuccess(runCourse("submit", workspace, checkpoint, evidence));
+    const stillLocked = runCourse("route", workspace, "product-discovery");
+    assert.notEqual(stillLocked.status, 0);
+    assert.match(stillLocked.stderr, /prerequisites/);
+    assertSuccess(
+      runCourse(
+        "review",
+        workspace,
+        checkpoint,
+        "pass",
+        "--hint",
+        "none",
+        "--feedback",
+        `Reviewed evidence for ${checkpoint}`,
+      ),
+    );
   }
 
+  const assessmentRequired = runCourse(
+    "route",
+    workspace,
+    "product-discovery",
+  );
+  assert.notEqual(assessmentRequired.status, 0);
+  assert.match(assessmentRequired.stderr, /prerequisites/);
+
+  const assessmentRecord = join(
+    workspace,
+    "learner-artifacts",
+    "foundation-assessment.md",
+  );
+  writeFileSync(
+    assessmentRecord,
+    "# Foundation assessment\n\nEvidence supports every required dimension.\n",
+  );
+  const failedAssessment = runCourse(
+    "assess",
+    workspace,
+    "foundation",
+    "1,2,2,2,2",
+    "--record",
+    assessmentRecord,
+    "--feedback",
+    "Routing evidence still needs one independent correction.",
+  );
+  assertSuccess(failedAssessment);
+  assert.match(failedAssessment.stdout, /needs-review/);
+  const routeAfterFailedAssessment = runCourse(
+    "route",
+    workspace,
+    "product-discovery",
+  );
+  assert.notEqual(routeAfterFailedAssessment.status, 0);
+  assert.match(routeAfterFailedAssessment.stderr, /prerequisites/);
+
+  assertSuccess(
+    runCourse(
+      "assess",
+      workspace,
+      "foundation",
+      "2,2,2,2,2",
+      "--record",
+      assessmentRecord,
+      "--feedback",
+      "Foundation evidence demonstrates the required routing boundaries.",
+    ),
+  );
   const route = runCourse("route", workspace, "product-discovery");
   assertSuccess(route);
   assert.match(route.stdout, /Next checkpoint: PD-01/);
   assertSuccess(runCourse("doctor", workspace));
+  const finalProgress = JSON.parse(
+    readFileSync(join(workspace, ".learn-baseline", "progress.json"), "utf8"),
+  );
+  assert.equal(Object.keys(finalProgress.retiredAssessments).length, 1);
+
+  const acceptedEvidence = join(
+    workspace,
+    "learner-artifacts",
+    "foundation-routing.md",
+  );
+  writeFileSync(acceptedEvidence, "# Accepted evidence changed\n");
+  const routeWithChangedEvidence = runCourse(
+    "route",
+    workspace,
+    "evidence-validation",
+  );
+  assert.notEqual(routeWithChangedEvidence.status, 0);
+  assert.match(routeWithChangedEvidence.stderr, /Evidence changed after submission/);
+  writeFileSync(acceptedEvidence, "# FND-01\n");
+
+  writeFileSync(assessmentRecord, "# Assessment changed after acceptance\n");
+  const changedAssessment = runCourse("doctor", workspace);
+  assert.notEqual(changedAssessment.status, 0);
+  assert.match(changedAssessment.stderr, /Track assessment record changed/);
+  const routeWithChangedAssessment = runCourse(
+    "route",
+    workspace,
+    "evidence-validation",
+  );
+  assert.notEqual(routeWithChangedAssessment.status, 0);
+  assert.match(routeWithChangedAssessment.stderr, /Track assessment record changed/);
 });
 
 test("detects changed evidence and migrates stale course identity", () => {
@@ -129,22 +305,34 @@ test("detects changed evidence and migrates stale course identity", () => {
     "foundation-routing.md",
   );
   writeFileSync(evidence, "# Routing\n");
-  assertSuccess(runCourse("checkpoint", workspace, "FND-01", evidence));
+  assertSuccess(runCourse("submit", workspace, "FND-01", evidence));
 
   writeFileSync(evidence, "# Routing changed after review\n");
   const changed = runCourse("doctor", workspace);
   assert.notEqual(changed.status, 0);
-  assert.match(changed.stderr, /Evidence changed/);
+  assert.match(changed.stderr, /Evidence changed after submission/);
 
   const progressPath = join(workspace, ".learn-baseline", "progress.json");
   const progress = JSON.parse(readFileSync(progressPath, "utf8"));
-  progress.courseVersion = "0.9.0";
+  progress.schemaVersion = 1;
+  progress.courseVersion = "1.0.0";
   progress.manifestDigest = "stale";
+  progress.checkpoints["FND-01"] = {
+    completedAt: new Date().toISOString(),
+    evidence: "learner-artifacts/foundation-routing.md",
+    sha256: hashText("# Routing changed after review\n"),
+    track: "foundation",
+    title: "Route requests by outcome",
+  };
   writeFileSync(progressPath, `${JSON.stringify(progress, null, 2)}\n`);
 
   const migrated = runCourse("migrate", workspace);
   assertSuccess(migrated);
-  assert.match(migrated.stdout, /0.9.0 -> 1.0.0/);
+  assert.match(migrated.stdout, /1.0.0 -> 1.1.0/);
+  const migratedProgress = JSON.parse(readFileSync(progressPath, "utf8"));
+  assert.equal(migratedProgress.schemaVersion, 2);
+  assert.equal(migratedProgress.checkpoints["FND-01"].status, "submitted");
+  assert.equal(migratedProgress.assessments.foundation, undefined);
 });
 
 function initializedWorkspace() {
@@ -171,4 +359,8 @@ function runNode(script, ...args) {
 
 function assertSuccess(result) {
   assert.equal(result.status, 0, result.stderr || result.stdout);
+}
+
+function hashText(value) {
+  return createHash("sha256").update(value).digest("hex");
 }

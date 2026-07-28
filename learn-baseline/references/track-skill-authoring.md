@@ -8,7 +8,9 @@ Teach the learner to create predictable skills with clear invocation, progressiv
 
 **Concept:** A skill earns model invocation through a distinct leading word or independent workflow. Manual skills reduce context load when the learner can choose them directly.
 
-**Learner action:** Choose one repeated workflow from `requests/skill-idea.md`. Create `learner-artifacts/authoring-invocation-contract.md` with skill name, leading word, concrete trigger examples, non-triggers, model or manual invocation choice, and observable completion criterion.
+**Skill practice:** Invoke `writing-great-skills` as the review authority for the proposed invocation contract.
+
+**Learner action:** Choose one repeated workflow from `requests/skill-idea.md`, apply `writing-great-skills`, and create `learner-artifacts/authoring-invocation-contract.md` with skill name, leading word, concrete trigger examples, non-triggers, model or manual invocation choice, and observable completion criterion.
 
 **Evidence:** `learner-artifacts/authoring-invocation-contract.md`
 
@@ -25,6 +27,8 @@ Teach the learner to create predictable skills with clear invocation, progressiv
 **Outcome:** The learner can plan a concise skill using the information hierarchy.
 
 **Concept:** Put immediate ordered steps in `SKILL.md`, branch-specific knowledge in references, deterministic repeated work in scripts, and copied output material in assets.
+
+**Skill practice:** Design exercise that prepares the later `write-a-skill` run; no additional skill is claimed here.
 
 **Learner action:** Create `learner-artifacts/authoring-skill-plan.md` with proposed tree, responsibility of each file, context pointer from `SKILL.md`, degree of freedom, and no-op or duplication risks.
 
@@ -44,7 +48,9 @@ Teach the learner to create predictable skills with clear invocation, progressiv
 
 **Concept:** Use the standard initializer, generate UI metadata from the final skill, run structural validation, and test every added script.
 
-**Learner action:** Build the draft under `draft-skill/` in the lab. Run the available skill validator and capture commands, outputs, one corrected validation failure, and script test evidence in `learner-artifacts/authoring-validation.md`.
+**Skill practice:** Invoke `write-a-skill` to create the draft and use its prescribed validators rather than hand-building an unverified directory.
+
+**Learner action:** Invoke `write-a-skill` and build the draft under `draft-skill/` in the lab. Run the available skill validator and capture commands, outputs, one corrected validation failure, and script test evidence in `learner-artifacts/authoring-validation.md`.
 
 **Evidence:** `learner-artifacts/authoring-validation.md`
 
@@ -61,6 +67,8 @@ Teach the learner to create predictable skills with clear invocation, progressiv
 **Outcome:** The learner can add, rename, or retire a skill without leaving broken integrations.
 
 **Concept:** Registry maintenance includes explicit invocations, UI metadata, compatibility aliases, installation locks, transfer packs, and active project references.
+
+**Skill practice:** Integration exercise for the draft created with `write-a-skill`; no additional skill is claimed here.
 
 **Learner action:** Create `learner-artifacts/authoring-routing-audit.md` with proposed registry change, compatibility decision, exact audit commands, integration surfaces, expected failures before repair, and acceptance criteria after repair.
 

@@ -8,7 +8,9 @@ The learner must route and complete a fresh scenario with reduced guidance. Sele
 
 **Concept:** A capstone tests transfer. It needs a fresh input, stable authority, a bounded result, and an explicit non-goal.
 
-**Learner action:** Choose `requests/capstone-scenario.md` or propose an equivalent safe scenario. Create `learner-artifacts/capstone-brief.md` with current state, desired outcome, authoritative inputs, constraints, non-goals, and success evidence.
+**Skill practice:** Transfer exercise using only skills practiced in the completed elective; no new skill may be claimed from the capstone.
+
+**Learner action:** Choose the scenario matching the completed elective: `capstone-product-scenario.md`, `capstone-evidence-scenario.md`, `capstone-delivery-scenario.md`, `capstone-maintenance-scenario.md`, or `capstone-authoring-scenario.md`. Create `learner-artifacts/capstone-brief.md` with current state, desired outcome, authoritative inputs, constraints, non-goals, and success evidence.
 
 **Evidence:** `learner-artifacts/capstone-brief.md`
 
@@ -25,6 +27,8 @@ The learner must route and complete a fresh scenario with reduced guidance. Sele
 **Outcome:** The learner independently selects a skill sequence and return paths.
 
 **Concept:** The best route is the smallest sequence that resolves the current blocker while preserving authority.
+
+**Skill practice:** Reuse practiced skills without instructor-selected routing.
 
 **Learner action:** Create `learner-artifacts/capstone-route.md` with each step's skill, input, output, completion criterion, stop condition, detour return target, and one adjacent route deliberately excluded.
 
@@ -44,6 +48,8 @@ The learner must route and complete a fresh scenario with reduced guidance. Sele
 
 **Concept:** Execution follows the invoked skills' own contracts. The capstone instructor observes and questions; it does not become a second workflow authority.
 
+**Skill practice:** Execute the learner-selected practiced skill sequence in the safe lab.
+
 **Learner action:** Execute the route in the lab. Create `learner-artifacts/capstone-execution.md` linking each actual artifact, command result, user decision, deviation, and return.
 
 **Evidence:** `learner-artifacts/capstone-execution.md`
@@ -62,6 +68,8 @@ The learner must route and complete a fresh scenario with reduced guidance. Sele
 
 **Concept:** Review distinguishes artifact quality from routing quality. Repair the highest-leverage weakness without rewriting history.
 
+**Skill practice:** Self-review of the practiced route; this does not add a new skill to coverage.
+
 **Learner action:** Score the execution using `assessment-rubric.md`. Create `learner-artifacts/capstone-review.md` with evidence for each score, one weakness, the repair made, and residual risk.
 
 **Evidence:** `learner-artifacts/capstone-review.md`
@@ -79,6 +87,8 @@ The learner must route and complete a fresh scenario with reduced guidance. Sele
 **Outcome:** The learner can transfer the method by teaching it without reciting course text.
 
 **Concept:** Teaching back reveals whether the learner understands causality: why this route, why not another, what evidence closes it, and where control returns.
+
+**Skill practice:** Transfer and explanation of previously practiced skills.
 
 **Learner action:** Create `learner-artifacts/capstone-teachback.md` as a short guide for a new teammate. Include a fresh example, decision tree, common failure, recovery, and one self-check question.
 

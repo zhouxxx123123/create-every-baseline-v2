@@ -1,3 +1,7 @@
 node_modules/
 coverage/
 .DS_Store
+.learn-baseline/
+conflict-lab/
+learner-artifacts/*
+!learner-artifacts/.gitkeep

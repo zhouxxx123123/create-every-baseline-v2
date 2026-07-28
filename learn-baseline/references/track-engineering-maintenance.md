@@ -8,7 +8,9 @@ Teach the learner to create reliable feedback, triage raw work, find deepening o
 
 **Concept:** A diagnosis starts with a trustworthy red signal at a public seam. Hypotheses consume the loop; they do not replace it.
 
-**Learner action:** Read `requests/bug-report.md`, inspect `src/task-store.mjs`, and run the existing tests. Add or describe the smallest regression test that fails on this bug. Create `learner-artifacts/maintenance-bug-loop.md` with command, expected red output, seam, minimized fixture, and why the signal is specific.
+**Skill practice:** Invoke `diagnosing-bugs` and build a real failing regression signal. `diagnose` is only a compatibility name.
+
+**Learner action:** Read `requests/bug-report.md`, invoke `diagnosing-bugs`, inspect `src/task-store.mjs`, and run the existing tests. Add the smallest regression test that fails on this bug. Create `learner-artifacts/maintenance-bug-loop.md` with command, captured red output, seam, minimized fixture, hypotheses, and why the signal is specific.
 
 **Evidence:** `learner-artifacts/maintenance-bug-loop.md`
 
@@ -26,7 +28,9 @@ Teach the learner to create reliable feedback, triage raw work, find deepening o
 
 **Concept:** Architecture maintenance looks for behavior spread across callers or shallow interfaces. It produces an improvement candidate, not an unapproved rewrite.
 
-**Learner action:** Inspect the fixture module and bug path. Create `learner-artifacts/maintenance-architecture.md` with current interface, implementation knowledge leaked to callers, proposed seam, deeper interface, expected leverage, migration risk, and a question to grill before changing it.
+**Skill practice:** Use `codebase-design` vocabulary to inspect the seam, then invoke `improve-codebase-architecture` in report-only mode without applying a refactor.
+
+**Learner action:** Inspect the fixture module and bug path with `codebase-design`, run `improve-codebase-architecture` in report-only mode, and create `learner-artifacts/maintenance-architecture.md` with current interface, implementation knowledge leaked to callers, proposed seam, deeper interface, expected leverage, migration risk, and a question to grill before changing it.
 
 **Evidence:** `learner-artifacts/maintenance-architecture.md`
 
@@ -44,7 +48,9 @@ Teach the learner to create reliable feedback, triage raw work, find deepening o
 
 **Concept:** Triage categorizes and verifies external requests. It does not silently redesign them or send generated implementation tickets back through raw triage.
 
-**Learner action:** Read `requests/raw-issue.md`. Create `learner-artifacts/maintenance-triage.md` with request type, verification evidence, missing information, selected triage state, durable brief, and the condition that makes it ready.
+**Skill practice:** Invoke `triage` against the local raw request without writing to an external tracker.
+
+**Learner action:** Read `requests/raw-issue.md`, invoke `triage` in local-output mode, and create `learner-artifacts/maintenance-triage.md` with request type, verification evidence, missing information, selected triage state, durable brief, and the condition that makes it ready.
 
 **Evidence:** `learner-artifacts/maintenance-triage.md`
 
@@ -56,13 +62,15 @@ Teach the learner to create reliable feedback, triage raw work, find deepening o
 
 **Next:** `EM-04`
 
-## EM-04: Plan a non-destructive conflict recovery
+## EM-04: Resolve an isolated merge conflict safely
 
-**Outcome:** The learner can inspect and plan an in-progress merge or rebase conflict without discarding user changes.
+**Outcome:** The learner can inspect, resolve, validate, and complete an in-progress merge without discarding unrelated changes.
 
 **Concept:** Conflict resolution preserves both sides' intent, repository status, and operation identity. It avoids destructive reset and interactive Git when a deterministic command exists.
 
-**Learner action:** Read `requests/conflict-scenario.md`. Create `learner-artifacts/maintenance-conflict-recovery.md` with inspection commands, conflict classification, intent from each side, proposed merged result, validation commands, continuation command, and abort boundary.
+**Skill practice:** Create the isolated nested conflict and invoke `resolving-merge-conflicts` against that real in-progress merge.
+
+**Learner action:** Read `requests/conflict-scenario.md`, run its preparation script, and invoke `resolving-merge-conflicts` only inside `conflict-lab/`. Resolve and complete the merge, then create `learner-artifacts/maintenance-conflict-recovery.md` with inspection commands, conflict classification, intent from each side, merged result, validation commands, resulting commit identity, and proof that the outer workspace was untouched.
 
 **Evidence:** `learner-artifacts/maintenance-conflict-recovery.md`
 
@@ -70,6 +78,6 @@ Teach the learner to create reliable feedback, triage raw work, find deepening o
 
 **Feedback focus:** Catch destructive commands, unresolved semantic conflict, validation after continuation instead of before, and loss of unrelated changes.
 
-**Advance when:** The plan can resolve the conflict non-interactively while preserving both intended behaviors or explicitly escalating an irreconcilable choice.
+**Advance when:** The nested merge is complete, validation passes, both compatible intents are preserved, and the outer workspace remains unchanged.
 
 **Next:** Run the maintenance assessment or begin a maintenance capstone.

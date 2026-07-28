@@ -8,7 +8,9 @@ Teach the learner to preserve confirmed product authority while moving through s
 
 **Concept:** A current readiness receipt authorizes one matching bounded target. `to-spec` synthesizes confirmed context; it does not interview or invent missing behavior.
 
-**Learner action:** Read `requests/delivery-context.md`. Create `learner-artifacts/delivery-spec-boundary.md` with target, receipt identity, admitted canonical sources, in-scope behavior, explicit boundaries, prototype evidence, and reasons to stop.
+**Skill practice:** Invoke `to-spec` in local-output mode for the admitted fictional target. `to-prd` is only a compatibility name.
+
+**Learner action:** Read `requests/delivery-context.md`. Invoke `to-spec` without publishing externally, then create `learner-artifacts/delivery-spec-boundary.md` linking the produced specification and recording target, receipt identity, admitted canonical sources, in-scope behavior, explicit boundaries, prototype evidence, and reasons to stop.
 
 **Evidence:** `learner-artifacts/delivery-spec-boundary.md`
 
@@ -26,7 +28,9 @@ Teach the learner to preserve confirmed product authority while moving through s
 
 **Concept:** Each ticket delivers a thin behavior across necessary layers, owns explicit acceptance criteria, and declares only real blocking dependencies.
 
-**Learner action:** Use the spec boundary to create `learner-artifacts/delivery-ticket-plan.md`. Include ticket title, user-visible slice, owned requirements, acceptance criteria, evidence references, blocker edges, and expected executable frontier.
+**Skill practice:** Invoke `to-tickets` against the local specification. `to-issues` is only a compatibility name.
+
+**Learner action:** Invoke `to-tickets` in local-output mode and create `learner-artifacts/delivery-ticket-plan.md`. Include ticket title, user-visible slice, owned requirements, acceptance criteria, evidence references, blocker edges, and expected executable frontier.
 
 **Evidence:** `learner-artifacts/delivery-ticket-plan.md`
 
@@ -44,7 +48,9 @@ Teach the learner to preserve confirmed product authority while moving through s
 
 **Concept:** The contract names behavior, domain vocabulary, source of truth, writeback, handoffs, permission boundary, failure boundary, seams, and acceptance commands.
 
-**Learner action:** Choose the first ticket. Create `learner-artifacts/delivery-implementation-contract.md` with the implementation contract and a list of stop conditions that route missing authority back to its owner.
+**Skill practice:** Invoke `prd-implementation-precheck` on the first ticket and stop if its authority is incomplete.
+
+**Learner action:** Choose the first ticket, invoke `prd-implementation-precheck`, and create `learner-artifacts/delivery-implementation-contract.md` with the precheck result, implementation contract, and stop conditions that route missing authority back to its owner.
 
 **Evidence:** `learner-artifacts/delivery-implementation-contract.md`
 
@@ -62,7 +68,9 @@ Teach the learner to preserve confirmed product authority while moving through s
 
 **Concept:** TDD proves behavior at an agreed public seam. Code review then checks both repository standards and the originating specification; green tests do not prove both.
 
-**Learner action:** Inspect `src/task-store.mjs` and its tests. Create `learner-artifacts/delivery-test-review.md` naming the seam, one red-green slice, commands, standards findings, specification findings, severity, and remaining test gap.
+**Skill practice:** Invoke `implement` for the bounded rename ticket, use `tdd` to capture a real red-green cycle, then invoke `code-review` against the resulting local diff.
+
+**Learner action:** Work only in the lab. Inspect `src/task-store.mjs`, add the regression test first, run it red, apply the smallest fix through `implement`, run it green, and invoke `code-review`. Create `learner-artifacts/delivery-test-review.md` with the seam, commands and outputs, diff identity, standards findings, specification findings, severity, and remaining test gap.
 
 **Evidence:** `learner-artifacts/delivery-test-review.md`
 
@@ -80,7 +88,9 @@ Teach the learner to preserve confirmed product authority while moving through s
 
 **Concept:** Functional tests can pass while visible state, interaction, or navigation diverges. Parity compares live evidence with the exact approved prototype scope; it does not redesign either side.
 
-**Learner action:** Use `requests/parity-scenario.md`. Create `learner-artifacts/delivery-parity-closeout.md` with approved source identity, admitted states, live evidence required, concrete gap format, owner for each gap, and closeout conditions.
+**Skill practice:** Invoke `prototype-parity-check` on the supplied simulated approved/live evidence pair; do not treat the simulation as production validation.
+
+**Learner action:** Use `requests/parity-scenario.md`, invoke `prototype-parity-check`, and create `learner-artifacts/delivery-parity-closeout.md` with approved source identity, admitted states, observed evidence, concrete gaps, owner for each gap, and closeout conditions.
 
 **Evidence:** `learner-artifacts/delivery-parity-closeout.md`
 

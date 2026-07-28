@@ -1,4 +1,4 @@
-# Capstone Scenario
+# Product Discovery Capstone
 
 Harbor Tasks is considering a "Review later" action.
 
@@ -12,7 +12,7 @@ Unknown:
 
 - whether "Review later" creates a Review Request, a reminder schedule, or both;
 - where the user recovers the item;
-- whether a user without Project access may receive it;
-- whether a delayed reminder can be delivered reliably on the target desktop platform.
+- whether a user without Project access may receive it.
 
-Choose one bounded outcome aligned with a completed elective. Do not attempt to solve all unknowns in one capstone.
+Resolve one foundational product question, route every adjacent uncertainty, and
+preserve an exact return path. Do not solve the whole feature.
