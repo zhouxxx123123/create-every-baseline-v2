@@ -1,0 +1,19 @@
+# {{TITLE}} 总控提示词
+
+在 `{{REPO_ROOT}}` 执行本 Goal。
+
+开始前依次读取：
+
+1. [任务包说明]({{ABS_PACKAGE}}/README.md)
+2. [Goal 总契约]({{ABS_PACKAGE}}/00-goal-contract.md)
+3. [运行进度记录]({{ABS_PACKAGE}}/progress.md)
+
+随后严格按以下顺序执行：
+
+{{STAGE_LIST_ABSOLUTE}}
+
+每个阶段开始前重新读取对应任务文件。每个阶段完成后验证完成条件并更新[运行进度记录]({{ABS_PACKAGE}}/progress.md)。除真实阻塞外，不在阶段之间等待用户输入。
+
+任务文件规定最低证据、输出、完成闸门和安全边界，不限制适用技能采用更好的调查方法。
+
+只允许修改[Goal 总契约]({{ABS_PACKAGE}}/00-goal-contract.md)登记的文件。完成最终阶段后按照其返回要求汇报。
