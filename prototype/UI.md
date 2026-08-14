@@ -9,7 +9,7 @@ If the question is about logic/state rather than what something looks like — w
 - `EXPLORE_VERSIONS`: no design has been selected, or the user explicitly asks for alternatives. Generate several different candidate versions.
 - `REFINE_SELECTED`: a version is already selected and the user asks to change or complete it. Build exactly one new candidate derived from the selected version; keep the selected artifact unchanged until the user chooses the new candidate.
 - `VERIFY_SELECTED`: the user asks whether the selected version already works. Do not create or modify a version; exercise and record its existing behaviour.
-- `COMPOSE_SELECTED`: several bounded prototypes already have selected versions and the user needs one continuously operable product workflow. Build one new integrated candidate with its own stable ID and an exact `Composed from` source list.
+- `COMPOSE_SELECTED`: several bounded prototypes already have selected versions, or one request names several modules that must be reviewed together. Build exactly one integrated candidate with its own stable ID, a frozen exact-once module inventory, one project, one start command, and one natural-entry URL.
 
 Do not reopen multi-version exploration during refinement or verification unless the user explicitly asks for alternatives.
 
@@ -47,9 +47,9 @@ In both sub-shapes, keep exploration controls separate from the exact formal rev
 
 ### 1. State the question, mode, and full prototype references
 
-For `EXPLORE_VERSIONS`, default to **3 versions**. More than 5 stops being radically different and starts being noise — cap there. For `REFINE_SELECTED`, create exactly one new version. For `VERIFY_SELECTED`, create none. For `COMPOSE_SELECTED`, create exactly one integrated candidate from the exact selected source versions.
+For `EXPLORE_VERSIONS`, default to **3 versions**. More than 5 stops being radically different and starts being noise — cap there. For `REFINE_SELECTED`, create exactly one new version. For `VERIFY_SELECTED`, create none. For `COMPOSE_SELECTED`, create exactly one integrated candidate from the exact selected source versions. Do not return one page or server per module when the request expects one combined prototype.
 
-Use the repository convention established by setup. Resolve the Prototype ID, reserve the next sequential version numbers in the manifest before building, and show the full prototype reference on review surfaces. Record `Derived from` as a full reference for refinements and exact manifest + full reference identities under `Composed from` for compositions. Give every version a concise semantic display name. Do not create standalone letter labels or opaque combinations such as `A`, `AJ`, `BF`, or `L1J`; preserve inherited codes only under the manifest's `Legacy aliases`.
+Use the repository convention established by setup. Resolve the Prototype ID, reserve the next sequential version numbers in the manifest before building, and show the full prototype reference on review surfaces. Record `Derived from` as a full reference for refinements. For compositions, freeze the caller's requested capability list in `Composition contract`, assign one Module ID to each capability, bind each Module ID to its exact source manifest/version/artifact/fixture, and list the complete Module ID set under `Composed from`. Give every version a concise semantic display name. Do not create standalone letter labels or opaque combinations such as `A`, `AJ`, `BF`, or `L1J`; preserve inherited codes only under the manifest's `Legacy aliases`.
 
 Write down the plan in one line, in the prototype's location or a top-of-file comment:
 
@@ -67,7 +67,7 @@ In `EXPLORE_VERSIONS`, make the candidates structurally different. In `REFINE_SE
 
 Exploration versions must be **structurally different** — different layout, different information hierarchy, different primary affordance, not just different colours. Refinement versions do not need artificial visual differences; they answer the bounded change request.
 
-For a composition, map every visible source action to its exact source manifest, version, and interaction ID. Add stable integration IDs for navigation and cross-workflow transitions that did not exist inside any source. If the sources conflict, stop and return the conflict to the originating product decision instead of silently choosing one.
+For a composition, map every visible source action to its Module ID, exact source manifest, version, and interaction ID. Add stable integration IDs for navigation and cross-workflow transitions that did not exist inside any source. Before wiring, compare the frozen requested Module ID set with the selected source set; stop on missing, duplicate, or unresolved modules. If the sources conflict, stop and return the conflict to the originating product decision instead of silently choosing one.
 
 ### 3. Wire them together
 
@@ -91,7 +91,9 @@ For sub-shape B (new page): the throwaway route under `/prototype/<name>` mounts
 
 The formal review route opens one exact version with the switcher hidden. It must resolve to the artifact and fixture refs recorded for that version, or the manifest must provide the exact command for reproducing that pinned artifact locally. A mutable development route alone is not a formal review source. The switcher belongs only to exploration mode.
 
-For `COMPOSE_SELECTED`, use one formal integration route with the normal product shell. Its natural entry, navigation, shared in-memory state or deterministic stubs, source-workflow handoffs, terminal result, and return path must all work without a version switcher or direct-state shortcut.
+For `COMPOSE_SELECTED`, put every requested module in one integrated project served by one start command and one formal integration URL with the normal product shell. Its natural entry, navigation, shared in-memory state or deterministic stubs, source-workflow handoffs, terminal result, and return path must all work without a version switcher, direct-state shortcut, separate module server, or extra review page.
+
+After wiring, traverse the running candidate from the single formal URL. For each frozen Module ID, verify the integrated surface appears exactly once and exercise its natural entry, material actions, handoff, and return path. Record `PASS` plus route/control-level evidence only after observing it. If any requested Module ID is missing, duplicated, unreachable, or a no-op, keep the composition unconfirmed and repair the same unreviewed candidate or create a new version when immutability already applies.
 
 ### 4. Build the floating switcher
 
@@ -112,7 +114,7 @@ Put the switcher in a single shared component so both sub-shapes can reuse it. L
 
 ### 5. Hand it over
 
-Surface the exploration URLs and one exact formal review URL per candidate. For every candidate the user sees, record the immutable artifact ref and fixed fixture ref so the same version can be reproduced later. If the user asks to combine parts of alternatives within one prototype, build that combination as one new derived version before asking them to select it. If the user asks to connect selected bounded workflows, build one `COMPOSE_SELECTED` version and surface its exact source-version and source-artifact list with the formal integration URL.
+Surface the exploration URLs and one exact formal review URL per candidate. For every candidate the user sees, record the immutable artifact ref and fixed fixture ref so the same version can be reproduced later. If the user asks to combine parts of alternatives within one prototype, build that combination as one new derived version before asking them to select it. If the user asks to connect selected bounded workflows, build one `COMPOSE_SELECTED` version and surface one start command, one formal integration URL, and an acceptance summary listing requested, integrated, missing, duplicate, and excluded Module IDs. Do not hand over while missing or duplicate sets are non-empty.
 
 ### 6. Capture the answer and retire exploration controls
 
@@ -128,6 +130,8 @@ Do not fold prototype code directly into production. The selected version and co
 - **Exploration versions that differ only in colour or copy.** Real alternatives disagree about structure; a small requested change is refinement, not exploration.
 - **Wiring versions to real mutations.** Use in-memory state or deterministic stubs. When the bounded question is a workflow, the visible user action and resulting transition must work even though the real backend is not involved.
 - **Pasting selected prototypes beside one another.** A composition must implement the natural entry, navigation, shared state, handoffs, and terminal continuity between them.
+- **Returning several runnable prototypes as one batch.** A composed result has one project, one start command, and one formal integration URL; separate module pages are source artifacts, not the assembled deliverable.
+- **Trusting generated module count.** Freeze the requested module inventory first and require every Module ID exactly once; never derive the expected set from whatever files were generated.
 - **Silently changing a source during composition.** Create and review a new derived source version, then create a new composed version that names it.
 - **Building a whole-product mega-prototype.** Compose one bounded release workflow or subsystem at a time and connect it through the shared shell.
 - **Promoting the prototype directly to production.** Prototype code was written under prototype constraints. Rewrite the selected behaviour properly during the production implementation workflow.

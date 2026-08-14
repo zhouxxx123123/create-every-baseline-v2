@@ -1,6 +1,6 @@
 ---
 name: prototype
-description: Build a throwaway prototype to answer a bounded design question. Use for state, component, logic, or end-to-end UI workflow validation, including version comparison and natural-entry interaction checks before specification.
+description: Build a throwaway prototype to answer a bounded design question. Use for state, component, logic, end-to-end UI workflow validation, or exact-once composition of several selected prototype modules into one runnable review surface before specification.
 ---
 
 # Prototype
@@ -93,7 +93,7 @@ Keep a manifest beside the prototype in the repository-declared format. If none 
 ## Prototype versions
 | Version ID | Full prototype reference | Display name | Legacy aliases | Derived from | Composed from | Status | Review route | Immutable artifact ref | Fixture ref | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| <ordered version ID> | <configured full prototype reference> | <semantic human-facing name> | <historical codes or `None`> | <full prototype ref or `None`> | <exact manifest + full prototype ref + artifact + fixture refs, or `None`> | `RESERVED | CANDIDATE | CURRENT_CANONICAL | NOT_SELECTED | SUPERSEDED | DEFERRED` | <formal route> | <commit, content hash, immutable build, or archived bundle> | <fixed data/config identity> | <reason or distinction> |
+| <ordered version ID> | <configured full prototype reference> | <semantic human-facing name> | <historical codes or `None`> | <full prototype ref or `None`> | <comma-separated Module IDs from Composition contract, or `None`> | `RESERVED | CANDIDATE | CURRENT_CANONICAL | NOT_SELECTED | SUPERSEDED | DEFERRED` | <formal route> | <commit, content hash, immutable build, or archived bundle> | <fixed data/config identity> | <reason or distinction> |
 
 ## Selection history
 | Selected at | Full prototype reference | Selected by | Superseded selection |
@@ -110,10 +110,20 @@ Keep a manifest beside the prototype in the repository-declared format. If none 
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | <full prototype reference> | <version-scoped stable ID> | <condition or action> | <result> | <reachability> | <check> | <review> | <observation, capture, or trace> |
 
+## Composition contract
+- Requested module count: <positive integer, or `Not applicable`>
+- Integrated project: <one directory or package, or `Not applicable`>
+- Start command: <one command that starts the whole composition, or `Not applicable`>
+- Formal integration URL: <one natural-entry URL, or `Not applicable`>
+
+| Full prototype reference | Module ID | Requested capability | Source manifest | Source version | Artifact ref | Fixture ref | Integrated surface | Integrated count | Runtime check | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| <composed full prototype reference> | <batch-stable module ID> | <capability from the caller's requested module list> | <exact manifest link> | <exact selected full prototype reference> | <immutable artifact ref> | <fixed fixture ref> | <route plus control or region identity> | `1` | `PASS | FAIL | NOT_RUN` | <running-prototype observation, capture, or trace> |
+
 ## Composition coverage
-| Integrated ID | Source manifest | Source version | Source IDs | Integration responsibility | Evidence |
-| --- | --- | --- | --- | --- | --- |
-| <version-scoped integration ID> | <manifest link> | <exact selected full prototype reference> | <exact source IDs> | <entry, navigation, shared state, handoff, writeback, or terminal result> | <observation, capture, or trace> |
+| Full prototype reference | Module ID | Integrated ID | Source manifest | Source version | Source IDs | Integration responsibility | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <composed full prototype reference> | <Module ID from Composition contract> | <version-scoped integration ID> | <manifest link> | <exact selected full prototype reference> | <exact source IDs> | <entry, navigation, shared state, handoff, writeback, or terminal result> | <observation, capture, or trace> |
 
 ## External boundaries
 | Control or handoff | Boundary owner | Behaviour validated here | Not validated here |
@@ -149,7 +159,9 @@ Keep a manifest beside the prototype in the repository-declared format. If none 
 <what this replaces and what later replaced it, if applicable>
 ```
 
-For `STATE` and `COMPONENT`, use only the coverage rows relevant to the bounded question and write `Not applicable` for journey fields. For `WORKFLOW`, the journey table is mandatory. For a non-composed version, write `None` under `Composed from` and `Not applicable` under `Composition coverage` and composed-source consumption. Namespace every coverage ID by prototype version so evidence from different versions cannot be mixed accidentally.
+For `STATE` and `COMPONENT`, use only the coverage rows relevant to the bounded question and write `Not applicable` for journey fields. For `WORKFLOW`, the journey table is mandatory. For a non-composed version, write `None` under `Composed from` and `Not applicable` under `Composition contract`, `Composition coverage`, and composed-source consumption. Namespace every coverage ID by prototype version so evidence from different versions cannot be mixed accidentally.
+
+For a multi-module request, freeze the caller's requested module list in `Composition contract` before building. Treat that list as the batch source of truth: every requested capability has one stable Module ID, one exact selected source identity, one integrated surface, and `Integrated count` exactly `1`. Do not remove, rename, split, merge, or add a module merely to match generated output; obtain an explicit scope change first. The composed version's `Composed from` Module IDs, the contract inventory, and the distinct Module IDs in `Composition coverage` must describe the same set.
 
 Run the bundled manifest validator after every material manifest edit:
 
@@ -158,7 +170,7 @@ node "<resolved-prototype-skill-dir>/scripts/validate-prototype-manifest.mjs" \
   <prototype-manifest.md>
 ```
 
-Before admitting reviewed evidence downstream, rerun it with `--require-canonical --require-confirmed`. The strict mode checks one canonical version, selection history, immutable artifact and fixture identities, reviewed-version alignment, concrete workflow journey evidence, downstream consumption identity, duplicate coverage IDs, and local decision/return links. Structural success does not replace product review.
+Before admitting reviewed evidence downstream, rerun it with `--require-canonical --require-confirmed`. The strict mode checks one canonical version, selection history, immutable artifact and fixture identities, reviewed-version alignment, concrete workflow journey evidence, downstream consumption identity, duplicate coverage IDs, local decision/return links, and composed-module exact-once/runtime acceptance. Structural success does not replace product review.
 
 Do not restate a product decision as if the manifest owns it. Link to the canonical decision; after review, the originating workflow decides whether and where that decision is updated.
 
@@ -206,16 +218,21 @@ Downstream specifications and tickets pin one exact prototype version + immutabl
 
 ## Compose selected workflows
 
-Use `COMPOSE_SELECTED` when several bounded prototypes already have selected versions but the user needs to validate that they operate as one coherent product workflow.
+Use `COMPOSE_SELECTED` when several bounded prototypes already have selected versions but the user needs to validate that they operate as one coherent product workflow. When one request names several modules and expects one combined prototype, treat composition as the required batch-closing mode unless the user explicitly asks for independent artifacts.
 
-1. Create one new `WORKFLOW` prototype version with its own reserved full prototype reference. Record every source as an exact manifest, selected full prototype reference, immutable artifact ref, and fixture ref under `Composed from`; never infer a source from a filename, display name, route, or latest timestamp.
-2. Preserve each source version's accepted local behaviour. Add the shared product shell, natural entry, navigation, return paths, shared state, cross-workflow handoffs, durable writebacks, and terminal result needed to make the bounded composition continuously operable.
-3. Record every admitted source ID and every new cross-workflow integration ID in `Composition coverage`. A visible source action that becomes a no-op after composition fails the composed workflow.
-4. If composition requires changing an accepted source behaviour, do not edit it inside the composition. Create and review a new derived source version first, then create a new composed version that names the replacement source.
-5. Review the composed version from its natural entry through every in-scope source workflow and the final handoff. Selecting a composed version does not erase or replace the canonical selections inside its source manifests.
-6. Keep the target bounded to one release workflow or subsystem. Do not build a whole-product mega-prototype merely because several prototypes exist.
+1. Freeze the requested module list before generating the composition. Assign each requested capability one stable Module ID, resolve its exact selected manifest/version/artifact/fixture identity, and record the expected module count. Stop if a requested module has no selected source or if two entries resolve to the same source identity without an explicit reason from the caller.
+2. Create exactly one new `WORKFLOW` prototype version with its own reserved full prototype reference. Record its `Composed from` value as the complete comma-separated Module ID set; never infer a source from a filename, display name, route, or latest timestamp.
+3. Build every module in one integrated project with one start command and one natural-entry formal integration URL. A composition that still requires separate servers, commands, or review pages is not assembled.
+4. Preserve each source version's accepted local behaviour. Add the shared product shell, natural entry, navigation, return paths, shared state, cross-workflow handoffs, durable writebacks, and terminal result needed to make the bounded composition continuously operable.
+5. Record every admitted source ID and every new cross-workflow integration ID in `Composition coverage`, keyed by Module ID. The inventory, `Composed from`, and coverage Module ID sets must be equal; every inventory row must have `Integrated count` exactly `1`. A missing module, duplicate module, orphaned source, or visible source action that becomes a no-op fails the composed workflow.
+6. If composition requires changing an accepted source behaviour, do not edit it inside the composition. Create and review a new derived source version first, then create a new composed version that names the replacement source.
+7. Start the whole candidate with the recorded single command. From the recorded single URL, traverse every Module ID through its natural entry and required handoff in the running prototype. Record route/control-level evidence and mark runtime `PASS` only after observing the intended source behaviour; source presence in code or a manifest assertion is insufficient.
+8. Review the composed version from its natural entry through every in-scope source workflow and the final handoff. Selecting a composed version does not erase or replace the canonical selections inside its source manifests.
+9. Keep the target bounded to one release workflow or subsystem. Do not build a whole-product mega-prototype merely because several prototypes exist.
 
 A composed version is the explicit, reviewed exception to the no-mixing rule: downstream work may consume only the exact source-version set and IDs named by that composed version. The composed version governs cross-workflow entry, navigation, shared state, and handoffs; source versions govern their admitted local interaction details.
+
+Do not hand off or mark a composition `CONFIRMED` unless the manifest validator passes with `--require-canonical --require-confirmed` and the reviewer can open the one formal integration URL after running the one recorded command. Report the requested, integrated, missing, duplicate, and excluded Module IDs explicitly; any non-empty missing or duplicate set is a failed assembly, not a partial success.
 
 ## Pick a branch
 
