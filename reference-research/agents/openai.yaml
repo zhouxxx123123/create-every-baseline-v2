@@ -1,0 +1,7 @@
+interface:
+  display_name: "参考研究"
+  short_description: "基于固定版本证据比较参考实现，并形成可复核、待确认的产品优化输入"
+  default_prompt: "使用 $reference-research 研究一个参考对象，并将证据、可迁移边界和待确认的优化候选返回原问题。"
+
+policy:
+  allow_implicit_invocation: true
