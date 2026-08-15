@@ -1,74 +1,48 @@
-# PolyForm Noncommercial License 1.0.0
+# Proprietary Copyright Notice - No License Granted
 
-<https://polyformproject.org/licenses/noncommercial/1.0.0>
+Copyright (c) 2026 zhouxxx123123
+All Rights Reserved.
 
-## Acceptance
+## 1. Scope
 
-In order to get any license under these terms, you must agree to them as both strict obligations and conditions to all your licenses.
+Except for the third-party material identified in `THIRD_PARTY_NOTICES.md`, this notice applies to all original material owned by the copyright holder and published in this repository (the "Covered Material").
 
-## Copyright License
+## 2. No License Granted
 
-The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe the licensor's copyright in it for any permitted purpose.  However, you may only distribute the software according to [Distribution License](#distribution-license) and make changes or new works based on the software according to [Changes and New Works License](#changes-and-new-works-license).
+No copyright, patent, trademark, trade-secret, or other intellectual-property license is granted for the Covered Material.
 
-## Distribution License
+To the extent permission is required by applicable law, you may not use, execute, install, copy, reproduce, modify, adapt, translate, publish, distribute, sublicense, sell, rent, host, provide as a service, or create derivative works from the Covered Material without the copyright holder's prior express written authorization. You also may not incorporate the Covered Material into any skill collection, agent, prompt library, application, service, model, dataset, product, or workflow without that authorization.
 
-The licensor grants you an additional copyright license to distribute copies of the software.  Your license to distribute covers distributing the software with changes and new works permitted by [Changes and New Works License](#changes-and-new-works-license).
+Public availability, access to the repository, downloading, cloning, or receipt of a copy does not by itself grant permission.
 
-## Notices
+## 3. Written Authorization
 
-You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms or the URL for them above, as well as copies of any plain-text lines beginning with `Required Notice:` that the licensor provided with the software.  For example:
+Authorization is valid only when the copyright holder expressly issues it in writing. It applies only to the recipient, Covered Material or version, purpose, rights, scope, duration, territory, and other conditions stated in that authorization.
 
-> Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
+Unless an authorization expressly says otherwise, it is personal, non-exclusive, non-transferable, non-sublicensable, and revocable upon breach of its conditions. Silence, oral statements, repository access, an issue or pull-request response, payment, or technical ability to copy the repository does not by itself constitute authorization.
 
-## Changes and New Works License
+See `PERMISSION.md` for the request process. The blank form in `AUTHORIZATION_TEMPLATE.md` is not an authorization.
 
-The licensor grants you an additional copyright license to make changes and new works based on the software for any permitted purpose.
+## 4. Public Repository and Legal Exceptions
 
-## Patent License
+Making this repository public does not grant rights beyond those required by GitHub's Terms of Service. GitHub users may view and fork public repository content through GitHub's Service as permitted by those terms.
 
-The licensor grants you a patent license for the software that covers patent claims the licensor can license, or becomes able to license, that you would infringe by using the software.
+Nothing in this notice limits rights that cannot lawfully be restricted, including any applicable statutory exceptions or limitations to copyright.
 
-## Noncommercial Purposes
+## 5. Third-Party Material
 
-Any noncommercial purpose is a permitted purpose.
+This notice does not replace or restrict licenses for third-party material. Each third-party component remains governed by its own license and notices.
 
-## Personal Uses
+In particular, the `agent-reach/` directory is governed by the MIT License in `agent-reach/LICENSE`, which permits commercial use subject to its terms.
 
-Personal use for research, experiment, and testing for the benefit of public knowledge, personal study, private entertainment, hobby projects, amateur pursuits, or religious observance, without any anticipated commercial application, is use for a permitted purpose.
+## 6. Earlier Versions
 
-## Noncommercial Organizations
+This notice applies to versions of the Covered Material published under it. It does not revoke permissions that a recipient validly obtained for an earlier version under an earlier license.
 
-Use by any charitable organization, educational institution, public research organization, public safety or health organization, environmental protection organization, or government institution is use for a permitted purpose regardless of the source of funding or obligations resulting from the funding.
+## 7. Reservation of Rights
 
-## Fair Use
+All rights not expressly granted in a separate written authorization are reserved by the copyright holder. No implied license, waiver, estoppel, or exhaustion is intended beyond what applicable law requires.
 
-You may have "fair use" rights for the software under the law. These terms do not limit them.
+## 8. Disclaimer
 
-## No Other Rights
-
-These terms do not allow you to sublicense or transfer any of your licenses to anyone else, or prevent the licensor from granting licenses to anyone else.  These terms do not imply any other licenses.
-
-## Patent Defense
-
-If you make any written claim that the software infringes or contributes to infringement of any patent, your patent license for the software granted under these terms ends immediately. If your company makes such a claim, your patent license ends immediately for work on behalf of your company.
-
-## Violations
-
-The first time you are notified in writing that you have violated any of these terms, or done anything with the software not covered by your licenses, your licenses can nonetheless continue if you come into full compliance with these terms, and take practical steps to correct past violations, within 32 days of receiving notice.  Otherwise, all your licenses end immediately.
-
-## No Liability
-
-***As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim.***
-
-## Definitions
-
-The **licensor** is the individual or entity offering these terms, and the **software** is the software the licensor makes available under these terms.
-
-**You** refers to the individual or entity agreeing to these terms.
-
-**Your company** is any legal entity, sole proprietorship, or other kind of organization that you work for, plus all organizations that have control over, are under the control of, or are under common control with that organization.  **Control** means ownership of substantially all the assets of an entity, or the power to direct its management and policies by vote, contract, or otherwise.  Control can be direct or indirect.
-
-**Your licenses** are all the licenses granted to you for the software under these terms.
-
-**Use** means anything you do with the software requiring one of your licenses.
-Required Notice: Copyright 2026 zhouxxx123123
+To the maximum extent permitted by applicable law, the Covered Material is provided "as is," without warranties or conditions of any kind. The copyright holder is not liable for damages arising from access to, inability to use, or authorized or unauthorized use of the Covered Material.

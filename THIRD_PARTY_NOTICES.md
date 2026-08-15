@@ -1,22 +1,21 @@
-# Third-Party Notices and License Scope
+# Third-Party Notices and Copyright Scope
 
 ## Original Repository Material
 
-Except for the agent-reach/ directory, the original material in this
-repository is licensed under the PolyForm Noncommercial License 1.0.0 in
-[LICENSE](LICENSE). Commercial use is not permitted without separate written
-permission from the copyright holder.
+Except for third-party material identified below or in an applicable component-level notice, all original material owned by the repository copyright holder is proprietary.
 
-Required Notice: Copyright 2026 zhouxxx123123
+Copyright (c) 2026 zhouxxx123123. All Rights Reserved.
+
+No public license is granted for that original material. Prior express written authorization is required for any use that requires copyright permission. See [LICENSE](LICENSE) and [PERMISSION.md](PERMISSION.md).
 
 ## Agent Reach
 
-The agent-reach/ directory contains material derived from
-[Panniantong/Agent-Reach](https://github.com/Panniantong/Agent-Reach).
+The `agent-reach/` directory contains material derived from [Panniantong/Agent-Reach](https://github.com/Panniantong/Agent-Reach).
 
 Copyright (c) 2025 Agent Eyes
 
-This directory is distributed under the MIT License preserved in
-[agent-reach/LICENSE](agent-reach/LICENSE). The repository's PolyForm
-Noncommercial license does not apply to this directory, and the upstream MIT
-license permits commercial use of this directory.
+That directory is distributed under the MIT License preserved in [agent-reach/LICENSE](agent-reach/LICENSE). The repository's proprietary notice does not apply to third-party rights in that directory, and the MIT License permits commercial use subject to its terms.
+
+## Other Third-Party Material
+
+A third-party license or notice applies only to the material it covers. Nothing in the repository's proprietary notice claims ownership of third-party material or removes rights granted by its original licensor.

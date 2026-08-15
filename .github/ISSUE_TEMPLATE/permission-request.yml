@@ -1,0 +1,62 @@
+name: Permission request
+description: Request written authorization for repository material. Filing this form does not grant permission.
+title: "[Permission Request] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is a public issue. Do not include confidential information, credentials, personal identification numbers, customer data, or trade secrets. Filing or receiving a response does not grant permission; authorization exists only after the copyright holder expressly issues it in writing.
+  - type: input
+    id: requester
+    attributes:
+      label: Requester
+      description: Full legal name and organization, if applicable.
+      placeholder: Name / organization
+    validations:
+      required: true
+  - type: input
+    id: contact
+    attributes:
+      label: Contact method
+      description: A non-confidential way for the copyright holder to contact you.
+      placeholder: Email or GitHub account
+    validations:
+      required: true
+  - type: textarea
+    id: material
+    attributes:
+      label: Requested material
+      description: Identify exact files, Skill directories, tag, version, or commit SHA.
+    validations:
+      required: true
+  - type: dropdown
+    id: use_type
+    attributes:
+      label: Intended use category
+      options:
+        - Commercial
+        - Internal organizational use
+        - Educational or research use
+        - Personal use
+        - Distribution or publication
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Intended purpose and required rights
+      description: Explain the product, project, deployment, users, duration, territory, and whether modification, hosting, integration, distribution, derivative works, or sublicensing is needed.
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgments
+    attributes:
+      label: Acknowledgments
+      options:
+        - label: I understand that this request and any acknowledgment do not grant permission.
+          required: true
+        - label: I understand that agent-reach/ is governed separately by its MIT License.
+          required: true
+        - label: I have not included confidential or sensitive information in this public issue.
+          required: true

@@ -398,16 +398,13 @@ node skill-router/scripts/audit-skill-integrations.mjs \
 
 ## License
 
-除 agent-reach/ 目录外，本仓库的原创内容采用
-[PolyForm Noncommercial License 1.0.0](LICENSE)。
+除 `agent-reach/` 目录外，本仓库由版权人原创并拥有的内容均为专有材料，版权人保留全部权利。当前版本不再向公众授予非商业使用许可，也没有默认授予安装、运行、复制、修改、改编、分发、再许可、销售、托管、集成或制作衍生作品的权利。
 
-你可以将这些内容用于个人学习、研究、实验和其他非商业目的，也可以在非商业目的下修改和分发；未经版权人另行书面授权，禁止用于任何商业目的。由于包含商业用途限制，本仓库属于源码可用项目，不属于 OSI 定义的开源软件。
+任何需要版权许可的使用，都必须事先取得版权人明确的书面授权。仓库公开可见或可下载，不代表获得使用许可；GitHub 用户仍可在 GitHub 服务功能及适用法律允许的范围内查看和 fork。完整边界见 [LICENSE](LICENSE)，申请授权见 [PERMISSION.md](PERMISSION.md)。空白授权模板见 [AUTHORIZATION_TEMPLATE.md](AUTHORIZATION_TEMPLATE.md)，它本身不授予任何权利。
 
-agent-reach/ 是单独的第三方例外，继续采用上游 MIT License。PolyForm
-Noncommercial 许可不适用于该目录，因此其商业使用权仍由上游 MIT
-许可决定。详见 [agent-reach/LICENSE](agent-reach/LICENSE) 和
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+`agent-reach/` 是单独的第三方例外，继续采用上游 MIT License，因此该目录仍可按 MIT 条款使用，包括商业使用。详见 [agent-reach/LICENSE](agent-reach/LICENSE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
+本次变更只适用于按当前版权声明发布的版本，不追溯撤销任何人此前已依据有效旧许可取得的旧版本权利。
 ## Repository
 
 - GitHub: [zhouxxx123123/create-every-baseline-v2](https://github.com/zhouxxx123123/create-every-baseline-v2)
