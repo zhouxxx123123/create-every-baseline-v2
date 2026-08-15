@@ -101,7 +101,7 @@ Use the repository-configured location. If none exists, use:
 `-- data-design-receipt.md
 ```
 
-The Markdown document explains the design to humans. The JSON file is the machine-verifiable contract described in [operational-model-contract.md](references/operational-model-contract.md). The receipt proves which exact JSON bytes passed which gate; it is workflow evidence, not product authority.
+The Markdown document explains the design to humans. The JSON file is the machine-verifiable contract described in [operational-model-contract.md](references/operational-model-contract.md). The receipt binds the exact Markdown and JSON bytes that passed the gate; it is workflow evidence, not product authority.
 
 Validate continuously:
 
@@ -125,6 +125,7 @@ Create the receipt only after the chosen gate passes:
 ```bash
 python "<resolved-skill-dir>/scripts/create_data_design_receipt.py" \
   <operational-data-design.json> \
+  --human-design <operational-data-design.md> \
   --gate READY_FOR_SPEC \
   --output <data-design-receipt.md>
 ```
@@ -138,7 +139,7 @@ python "<resolved-skill-dir>/scripts/verify_data_design_receipt.py" \
   <data-design-receipt.md>
 ```
 
-If the design hash, validator version, source identities, or gate no longer match, create a new receipt. Never rewrite an old receipt.
+If either design hash, validator version, source identities, quality review, acceptance, or gate no longer matches, create a new receipt. Never rewrite an old receipt.
 
 ## Perform quality review and package acceptance
 

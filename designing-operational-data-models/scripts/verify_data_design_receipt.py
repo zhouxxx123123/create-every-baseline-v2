@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -32,9 +33,41 @@ def verify_receipt(receipt_path: Path) -> dict[str, Any]:
         errors.append("Unsupported receipt schema version.")
     if record.get("validator_version") != VALIDATOR_VERSION:
         errors.append("Receipt validator version is stale.")
+    created_at = record.get("created_at")
+    try:
+        parsed_created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        if parsed_created_at.tzinfo is None:
+            raise ValueError
+    except (AttributeError, TypeError, ValueError):
+        errors.append("Receipt created_at is missing or invalid.")
     gate = record.get("gate")
     if gate not in {"READY_FOR_SPEC", "READY_FOR_TICKETS"}:
         errors.append("Receipt gate is invalid.")
+
+    required_fields = {
+        "receipt_schema_version",
+        "receipt_id",
+        "created_at",
+        "gate",
+        "validator_version",
+        "design_path",
+        "design_sha256",
+        "human_design_path",
+        "human_design_sha256",
+        "design_id",
+        "target",
+        "boundary",
+        "source_authority_ids",
+        "source_authority_digests",
+        "admission",
+        "quality_review",
+        "package_acceptance",
+    }
+    for field in sorted(required_fields - set(record)):
+        errors.append(f"Receipt required field is missing: {field}.")
+    authority_digests = record.get("source_authority_digests")
+    if not isinstance(authority_digests, dict) or not authority_digests:
+        errors.append("Receipt source authority digests are missing or invalid.")
 
     design_ref = record.get("design_path")
     if not isinstance(design_ref, str) or not design_ref.strip():
@@ -52,17 +85,36 @@ def verify_receipt(receipt_path: Path) -> dict[str, Any]:
         digest = hashlib.sha256(raw).hexdigest()
         if digest != record.get("design_sha256"):
             errors.append("Design SHA-256 does not match the immutable receipt.")
-        expected_receipt_id = f"{record.get('design_id')}:{gate}:{digest[:16]}"
-        if record.get("receipt_id") != expected_receipt_id:
-            errors.append("Receipt ID does not match its design, gate, and digest.")
         try:
             design = json.loads(raw.decode("utf-8"))
         except (UnicodeError, json.JSONDecodeError) as error:
             errors.append(f"Design JSON cannot be read: {error}")
 
+    human_ref = record.get("human_design_path")
+    if not isinstance(human_ref, str) or not human_ref.strip():
+        errors.append("Receipt human_design_path is missing.")
+        human_path = receipt_path.parent
+        human_digest = ""
+    else:
+        candidate = Path(human_ref)
+        human_path = candidate if candidate.is_absolute() else receipt_path.parent / candidate
+        if not human_path.is_file():
+            errors.append(f"Human design file is missing: {human_path}")
+            human_digest = ""
+        else:
+            human_digest = hashlib.sha256(human_path.read_bytes()).hexdigest()
+            if human_digest != record.get("human_design_sha256"):
+                errors.append("Human design SHA-256 does not match the immutable receipt.")
+
+    if design_path.is_file() and human_digest and gate in {"READY_FOR_SPEC", "READY_FOR_TICKETS"}:
+        digest = hashlib.sha256(design_path.read_bytes()).hexdigest()
+        expected_receipt_id = f"{record.get('design_id')}:{gate}:{digest[:12]}:{human_digest[:12]}"
+        if record.get("receipt_id") != expected_receipt_id:
+            errors.append("Receipt ID does not match its design, human companion, gate, and digests.")
+
     validation: dict[str, Any] | None = None
     if isinstance(design, dict) and gate in {"READY_FOR_SPEC", "READY_FOR_TICKETS"}:
-        validation = validate_design(design, gate)
+        validation = validate_design(design, gate, design_path)
         if validation["verdict"] != "PASS":
             errors.append("Current design no longer passes the receipt gate.")
         for field in ("design_id", "target", "boundary"):
@@ -75,6 +127,19 @@ def verify_receipt(receipt_path: Path) -> dict[str, Any]:
         )
         if source_ids != record.get("source_authority_ids"):
             errors.append("Receipt source authority IDs do not match the design.")
+        source_digests = {
+            item["stable_id"]: item["content_sha256"].lower()
+            for item in design.get("source_authorities", [])
+            if isinstance(item, dict)
+            and isinstance(item.get("stable_id"), str)
+            and isinstance(item.get("content_sha256"), str)
+        }
+        if source_digests != record.get("source_authority_digests"):
+            errors.append("Receipt source authority digests do not match the design.")
+        if design.get("admission") != record.get("admission"):
+            errors.append("Receipt admission evidence does not match the design.")
+        if design.get("quality_review") != record.get("quality_review"):
+            errors.append("Receipt quality review does not match the design.")
         if design.get("package_acceptance") != record.get("package_acceptance"):
             errors.append("Receipt package acceptance does not match the design.")
 

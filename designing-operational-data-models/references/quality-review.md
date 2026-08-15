@@ -81,8 +81,10 @@ Present one bounded design package to the user. Ask for package-level acceptance
 - physical constraint, concurrency, permission, and recovery tests;
 - no blocker of any kind.
 
+A P1 finding must be resolved. Marking P1 as `ACCEPTED_RISK` does not make either readiness gate pass.
+
 ## Receipt rules
 
-Create a receipt only after validation passes. The receipt records the exact design hash, gate, validator version, target, boundary, and source authority IDs. It does not replace product authority.
+Create a receipt only after deterministic validation, quality review, and package acceptance pass. The receipt records exact hashes for both the machine JSON and human Markdown, plus the gate, validator version, target, boundary, source authority IDs and digests, admission evidence, quality review, and package acceptance. It does not replace product authority.
 
-Receipts are immutable. A changed design, source identity, validator contract, or gate requires a new receipt. Downstream consumers must verify the receipt before using it.
+Receipts are immutable. A changed JSON or Markdown design, source identity or bytes, validator contract, admission, review, acceptance, or gate requires a new receipt. Downstream consumers must verify the receipt and both referenced files before using it.

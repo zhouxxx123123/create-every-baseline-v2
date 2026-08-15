@@ -65,6 +65,34 @@ Logical design is complete and the database is undecided. Passing output can rea
 
 Analytics needs facts from the operational model. Passing output defines a downstream dbt handoff while the operational store remains authoritative. Failing output moves command state or responsibility into dbt.
 
+### T11 Hollow logical package
+
+A package contains only common provenance fields and generic labels. It must fail with `MATERIAL_FIELD_MISSING`; a stable ID and rationale do not substitute for object identity, commands, permissions, transactions, consistency, and recovery semantics.
+
+### T12 All areas waived
+
+Every logical item is marked `OUT_OF_SCOPE` or `NOT_APPLICABLE`. It must fail: a target that persists operational business state requires active objects, invariants, commands, transaction boundaries, permission checks, consistency requirements, and contract tests.
+
+### T13 Physical safety under-testing
+
+A physical test covers only the selected adapter and migration item. It must fail until physical/end-to-end tests cover constraint, concurrency, permission, recovery, migration, and adapter categories.
+
+### T14 Bogus permission mapping
+
+A Supabase adapter names an unknown permission ID. It must fail; RLS may map only known product permission checks.
+
+### T15 Unverifiable authority
+
+A confirmed local authority path is missing, its digest mismatches, its version is absent, or its currentness check is stale. It must fail readiness rather than treating a status label as authority.
+
+### T16 Acceptance ID injection
+
+Package acceptance names an ID that is not a `PROPOSED_ARCHITECTURE` item. It must fail. The accepted set must exactly equal the proposed set.
+
+### T17 Receipt drift
+
+Remove a required timestamp or source digest, or change either the JSON or Markdown after receipt creation. Verification must fail. A receipt binds both exact design representations and does not authenticate modified bytes by status label alone.
+
 ## Expected routing
 
 For each scenario, check:
