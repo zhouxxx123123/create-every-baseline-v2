@@ -398,7 +398,15 @@ node skill-router/scripts/audit-skill-integrations.mjs \
 
 ## License
 
-当前仓库尚未包含根级 `LICENSE` 文件。公开可见不等于自动授予复制、修改或再分发权。准备接受外部使用或贡献前，应由仓库所有者明确选择并添加许可证。
+除 agent-reach/ 目录外，本仓库的原创内容采用
+[PolyForm Noncommercial License 1.0.0](LICENSE)。
+
+你可以将这些内容用于个人学习、研究、实验和其他非商业目的，也可以在非商业目的下修改和分发；未经版权人另行书面授权，禁止用于任何商业目的。由于包含商业用途限制，本仓库属于源码可用项目，不属于 OSI 定义的开源软件。
+
+agent-reach/ 是单独的第三方例外，继续采用上游 MIT License。PolyForm
+Noncommercial 许可不适用于该目录，因此其商业使用权仍由上游 MIT
+许可决定。详见 [agent-reach/LICENSE](agent-reach/LICENSE) 和
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## Repository
 
