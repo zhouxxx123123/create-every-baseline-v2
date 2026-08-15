@@ -32,8 +32,8 @@ test("validates course coverage and checkpoint structure", () => {
   const result = runNode(validatorScript);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Course structure is valid/);
-  assert.match(result.stdout, /Covered skills: 34/);
-  assert.match(result.stdout, /Practiced skills: 25/);
+  assert.match(result.stdout, /Covered skills: 35/);
+  assert.match(result.stdout, /Practiced skills: 26/);
   assert.match(result.stdout, /Reference-only skills: 9/);
 });
 
@@ -328,7 +328,7 @@ test("detects changed evidence and migrates stale course identity", () => {
 
   const migrated = runCourse("migrate", workspace);
   assertSuccess(migrated);
-  assert.match(migrated.stdout, /1.0.0 -> 1.1.0/);
+  assert.match(migrated.stdout, /1.0.0 -> 1.2.0/);
   const migratedProgress = JSON.parse(readFileSync(progressPath, "utf8"));
   assert.equal(migratedProgress.schemaVersion, 2);
   assert.equal(migratedProgress.checkpoints["FND-01"].status, "submitted");

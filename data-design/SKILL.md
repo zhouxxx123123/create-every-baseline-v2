@@ -1,9 +1,9 @@
 ---
-name: designing-operational-data-models
+name: data-design
 description: Convert confirmed product decisions and admitted prototype behavior into a database-neutral, traceable, and machine-validated operational data design before specification or database implementation. Use after Product Readiness for a bounded feature that persists business state, when defining business objects, identities, relationships, invariants, lifecycle transitions, commands, transaction boundaries, authorization checks, concurrency, idempotency, unknown-result recovery, audit facts, migrations, or conditional PostgreSQL/Supabase adapters. Route unresolved product behavior back to Wayfinder, missing interaction evidence to Prototype, and material technical uncertainty to Technical Spike. Do not use for analytics-only dbt models, exploratory schemas, or inventing product policy.
 ---
 
-# Designing Operational Data Models
+# Data Design
 
 Turn approved product behavior into an operational data contract. Keep product authority, logical business semantics, physical database choices, and analytical models separate.
 
@@ -101,7 +101,7 @@ Use the repository-configured location. If none exists, use:
 `-- data-design-receipt.md
 ```
 
-The Markdown document explains the design to humans. The JSON file is the machine-verifiable contract described in [operational-model-contract.md](references/operational-model-contract.md). The receipt binds the exact Markdown and JSON bytes that passed the gate; it is workflow evidence, not product authority.
+The Markdown document explains the design to humans. The JSON file is the machine-verifiable contract described in [operational-model-contract.md](references/operational-model-contract.md). The V2 receipt binds the exact Markdown and JSON bytes, complete machine identity, visible summary, and creation time that passed the gate; it is workflow evidence, not product authority.
 
 Validate continuously:
 
@@ -139,7 +139,7 @@ python "<resolved-skill-dir>/scripts/verify_data_design_receipt.py" \
   <data-design-receipt.md>
 ```
 
-If either design hash, validator version, source identities, quality review, acceptance, or gate no longer matches, create a new receipt. Never rewrite an old receipt.
+If either design hash, validator version, source identities, registered admission verification, quality review evidence, acceptance evidence, timestamp, visible summary, or gate no longer matches, create a new receipt. Never rewrite an old receipt.
 
 ## Perform quality review and package acceptance
 

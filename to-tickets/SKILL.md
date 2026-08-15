@@ -17,6 +17,8 @@ Only translate approved source material into executable vertical tickets and pub
 
 If a material product or technical decision required for slicing is absent, stop, identify the exact gap, and return to the repository-configured Workflow Authority. Do not hide the missing decision inside a ticket.
 
+If the approved specification persists operational business state, require a verified `READY_FOR_TICKETS` receipt from `data-design` before publishing database implementation or migration tickets. Verify it with `data-design/scripts/verify_data_design_receipt.py`. A `READY_FOR_SPEC` receipt authorizes specification only; it does not authorize physical database tickets. Stop and return to the data-design stage when the adapter, migration, physical evidence, or receipt is missing or stale.
+
 ## Process
 
 ### 1. Gather context
@@ -24,6 +26,8 @@ If a material product or technical decision required for slicing is absent, stop
 Work from whatever is already in the conversation context. If the user passes a reference (a spec path, an issue number or URL) as an argument, fetch it and read its full body and comments.
 
 Follow the source specification's links to the canonical product decisions, ADRs, cross-functional handoffs, and prototype manifests that define the work. Read the exact reviewed prototype states and each material decision's validation status, remaining assumptions, and stop conditions. Do not infer relationships from filenames or conversation memory.
+
+When an operational data-design receipt applies, follow its stable object, relationship, invariant, command, transaction, permission, consistency, idempotency, recovery, adapter, migration, and contract-test IDs. Give every affected ID an owning ticket or an explicit dependency. Tickets may refine reversible implementation detail but may not alter these contracts without returning to `data-design` and, for product behavior, the originating product authority.
 
 ### 2. Explore the codebase (optional)
 

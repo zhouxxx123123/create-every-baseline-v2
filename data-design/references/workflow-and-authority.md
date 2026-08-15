@@ -18,7 +18,7 @@ Wayfinder or product authority
   -> Prototype where behavior needs validation
   -> canonical decision absorbs admitted prototype evidence
   -> Product Readiness
-  -> designing-operational-data-models
+  -> data-design
   -> to-spec
   -> to-tickets
   -> implement and database adapter work
@@ -33,13 +33,13 @@ Record exact identities for:
 
 - the bounded target and specification boundary;
 - the current canonical product decisions;
-- the readiness receipt and its source identities;
+- the locally verifiable readiness receipt, registered verifier identity, and its source identities;
 - admitted prototype manifest, artifact, fixture, version, and confirmed IDs;
 - domain glossary terms and existing ADRs;
 - current storage, API, event, permission, and migration constraints;
 - the requested readiness gate.
 
-Stop if the readiness receipt is missing, stale, mismatched, or older than a material product change. Return to Product Readiness rather than repairing its receipt.
+Stop if the readiness receipt is missing, opaque, stale, mismatched, rejected by its registered verifier, or older than a material product change. Return to Product Readiness rather than repairing its receipt.
 
 ## Authority order
 

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "courseId": "learn-baseline",
-  "courseVersion": "1.1.0",
+  "courseVersion": "1.2.0",
   "defaultLocale": "auto",
   "skillContractsFile": "references/skill-contracts.json",
   "tracks": [
@@ -172,6 +172,7 @@
         "foundation"
       ],
       "skills": [
+        "data-design",
         "to-spec",
         "to-prd",
         "to-tickets",
@@ -193,6 +194,14 @@
           "evidence": "learner-artifacts/delivery-spec-boundary.md",
           "practicedSkills": [
             "to-spec"
+          ]
+        },
+        {
+          "id": "DL-01A",
+          "title": "Validate an operational data contract",
+          "evidence": "learner-artifacts/delivery-operational-data-contract.md",
+          "practicedSkills": [
+            "data-design"
           ]
         },
         {

@@ -7,11 +7,17 @@ import argparse
 import hashlib
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from create_data_design_receipt import BEGIN_MARKER, END_MARKER, RECEIPT_SCHEMA_VERSION
+from create_data_design_receipt import (
+    BEGIN_MARKER,
+    END_MARKER,
+    RECEIPT_SCHEMA_VERSION,
+    build_receipt_id,
+    render_receipt,
+)
 from validate_operational_data_design import VALIDATOR_VERSION, validate_design
 
 
@@ -26,18 +32,25 @@ def parse_receipt(text: str) -> dict[str, Any]:
 
 
 def verify_receipt(receipt_path: Path) -> dict[str, Any]:
-    record = parse_receipt(receipt_path.read_text(encoding="utf-8"))
+    receipt_text = receipt_path.read_text(encoding="utf-8")
+    record = parse_receipt(receipt_text)
     errors: list[str] = []
+
+    if receipt_text != render_receipt(record):
+        errors.append("Receipt visible content does not match its machine identity.")
 
     if record.get("receipt_schema_version") != RECEIPT_SCHEMA_VERSION:
         errors.append("Unsupported receipt schema version.")
     if record.get("validator_version") != VALIDATOR_VERSION:
         errors.append("Receipt validator version is stale.")
     created_at = record.get("created_at")
+    parsed_created_at: datetime | None = None
     try:
         parsed_created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
         if parsed_created_at.tzinfo is None:
             raise ValueError
+        if parsed_created_at > datetime.now(timezone.utc) + timedelta(minutes=5):
+            errors.append("Receipt created_at is in the future.")
     except (AttributeError, TypeError, ValueError):
         errors.append("Receipt created_at is missing or invalid.")
     gate = record.get("gate")
@@ -108,7 +121,7 @@ def verify_receipt(receipt_path: Path) -> dict[str, Any]:
 
     if design_path.is_file() and human_digest and gate in {"READY_FOR_SPEC", "READY_FOR_TICKETS"}:
         digest = hashlib.sha256(design_path.read_bytes()).hexdigest()
-        expected_receipt_id = f"{record.get('design_id')}:{gate}:{digest[:12]}:{human_digest[:12]}"
+        expected_receipt_id = build_receipt_id(record)
         if record.get("receipt_id") != expected_receipt_id:
             errors.append("Receipt ID does not match its design, human companion, gate, and digests.")
 
@@ -142,6 +155,20 @@ def verify_receipt(receipt_path: Path) -> dict[str, Any]:
             errors.append("Receipt quality review does not match the design.")
         if design.get("package_acceptance") != record.get("package_acceptance"):
             errors.append("Receipt package acceptance does not match the design.")
+        evidence_times = []
+        for container, field in (
+            (design.get("quality_review"), "reviewed_at"),
+            (design.get("package_acceptance"), "accepted_at"),
+        ):
+            if isinstance(container, dict) and isinstance(container.get(field), str):
+                try:
+                    value = datetime.fromisoformat(container[field].replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                if value.tzinfo is not None:
+                    evidence_times.append(value)
+        if parsed_created_at is not None and evidence_times and parsed_created_at < max(evidence_times):
+            errors.append("Receipt creation predates its review or package acceptance evidence.")
 
     return {
         "verdict": "PASS" if not errors else "FAIL",

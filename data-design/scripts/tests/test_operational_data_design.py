@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import subprocess
 import sys
@@ -10,6 +11,7 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
+PRODUCT_READINESS_SCRIPT = SCRIPT_DIR.parents[1] / "product-readiness" / "scripts" / "readiness-receipt.mjs"
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from create_data_design_receipt import BEGIN_MARKER, END_MARKER, build_receipt, main as create_receipt_main  # noqa: E402
@@ -35,7 +37,7 @@ def material(stable_id: str, **extra: object) -> dict[str, object]:
 
 def logical_ready_design() -> dict[str, object]:
     return {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "design_id": "DATA-DESIGN-001",
         "target": "Bounded work update",
         "boundary": "Persist one accepted update and exclude analytics.",
@@ -49,7 +51,7 @@ def logical_ready_design() -> dict[str, object]:
                 "version": "decision-revision-7",
                 "content_sha256": "a" * 64,
                 "currentness_status": "CURRENT",
-                "currentness_checked_at": "2026-08-15T00:00:00Z",
+                "currentness_checked_at": "2025-01-01T00:00:00Z",
             }
         ],
         "prototype_evidence": [],
@@ -108,7 +110,9 @@ def logical_ready_design() -> dict[str, object]:
                 command_refs=["CMD-001"],
                 writes=["Work current state", "immutable update fact"],
                 external_effects=[],
+                atomicity_mode="ATOMIC",
                 atomicity="All database writes commit or none commit.",
+                partial_success_mode="NONE",
                 partial_success_policy="No internal partial success; external delivery is separate.",
             )
         ],
@@ -128,7 +132,7 @@ def logical_ready_design() -> dict[str, object]:
                 "CONS-001",
                 name="Work revision consistency",
                 target_refs=["OBJ-001", "CMD-001"],
-                consistency_model="Optimistic concurrency",
+                consistency_model="OPTIMISTIC_CAS",
                 enforcement="Compare-and-swap expected revision",
                 conflict_outcome="No write and return current revision.",
             )
@@ -155,6 +159,7 @@ def logical_ready_design() -> dict[str, object]:
                 unknown_state="RESULT_UNKNOWN",
                 authoritative_source="Work current revision and update fact",
                 verification_method="Query by operation identity",
+                retry_mode="VERIFY_THEN_RETRY",
                 retry_policy="Retry only after authoritative absence is proven",
                 resolution_fact="Append linked verification result",
             )
@@ -193,17 +198,20 @@ def logical_ready_design() -> dict[str, object]:
         "quality_review": {
             "status": "PASSED",
             "reviewed_by": "Fresh-context reviewer",
-            "reviewed_at": "2026-08-15T00:10:00Z",
+            "reviewed_by_ref": "reviewer:independent-001",
+            "reviewed_at": "2025-01-01T00:10:00Z",
             "review_ref": "review://DATA-DESIGN-001/review-1",
+            "review_sha256": "c" * 64,
             "findings": [],
         },
         "package_acceptance": {
             "status": "ACCEPTED",
             "accepted_by": "Account owner",
             "accepted_by_ref": "user:account-001",
-            "accepted_at": "2026-08-15T00:00:00Z",
+            "accepted_at": "2025-01-01T00:20:00Z",
             "accepted_architecture_ids": [],
             "confirmation_ref": "conversation://confirmation/123",
+            "confirmation_sha256": "d" * 64,
         },
         "downstream_handoff": {
             "requested_gate": "READY_FOR_SPEC",
@@ -248,9 +256,127 @@ def physical_ready_design() -> dict[str, object]:
             covers=["ADAPTER-001", "MIGRATION-001"],
             coverage_categories=["CONSTRAINT", "CONCURRENCY", "PERMISSION", "RECOVERY", "MIGRATION", "ADAPTER"],
             expected_behavior="Constraints, conflicts, permissions, recovery, migration, and adapter mapping hold.",
+            evidence_ref="evidence://physical/test-run-1",
+            evidence_sha256="e" * 64,
+            runner="ci:physical-contracts",
+            run_at="2025-01-01T00:15:00Z",
+            result="PASS",
         )
     )
+    design["contract_tests"][1]["covers"] = [  # type: ignore[index]
+        "ADAPTER-001",
+        "MIGRATION-001",
+        "INV-001",
+        "CMD-001",
+        "PERM-001",
+        "CONS-001",
+        "IDEM-001",
+        "UNKNOWN-001",
+    ]
     return design
+
+
+def human_design_text(design: dict[str, object]) -> str:
+    ids: list[str] = []
+    for collection in (
+        "objects",
+        "relationships",
+        "invariants",
+        "state_transitions",
+        "commands",
+        "transaction_boundaries",
+        "permission_checks",
+        "consistency_requirements",
+        "idempotency_contracts",
+        "unknown_outcome_contracts",
+        "physical_adapters",
+        "migration_requirements",
+        "contract_tests",
+        "blocked_items",
+    ):
+        for item in design.get(collection, []):  # type: ignore[union-attr]
+            if isinstance(item, dict) and item.get("validation_status") != "NOT_APPLICABLE":
+                ids.append(str(item["stable_id"]))
+    return (
+        f"# Operational data design: {design['design_id']}\n\n"
+        f"Target: {design['target']}\n\n"
+        "## Contract identities\n\n"
+        + "\n".join(f"- `{item_id}`" for item_id in ids)
+        + "\n"
+    )
+
+
+def write_local_design_package(root: Path, design: dict[str, object]) -> tuple[Path, Path]:
+    authority_path = root / "authority.md"
+    authority_path.write_text("# Confirmed update\n\nThe bounded update behavior is confirmed.\n", encoding="utf-8")
+    design["source_authorities"][0].update(  # type: ignore[index]
+        {
+            "ref": "authority.md#confirmed-update",
+            "content_sha256": hashlib.sha256(authority_path.read_bytes()).hexdigest(),
+        }
+    )
+
+    review_path = root / "quality-review.md"
+    review_path.write_text("# Quality review\n\nAll four review axes passed.\n", encoding="utf-8")
+    design["quality_review"].update(  # type: ignore[union-attr]
+        {
+            "review_ref": "quality-review.md",
+            "review_sha256": hashlib.sha256(review_path.read_bytes()).hexdigest(),
+        }
+    )
+    confirmation_path = root / "package-acceptance.md"
+    confirmation_path.write_text("# Package acceptance\n\nThe bounded package was accepted.\n", encoding="utf-8")
+    design["package_acceptance"].update(  # type: ignore[union-attr]
+        {
+            "confirmation_ref": "package-acceptance.md",
+            "confirmation_sha256": hashlib.sha256(confirmation_path.read_bytes()).hexdigest(),
+        }
+    )
+
+    for test in design.get("contract_tests", []):  # type: ignore[union-attr]
+        if isinstance(test, dict) and test.get("test_level") in {"PHYSICAL", "END_TO_END"}:
+            evidence_path = root / f"{test['stable_id']}-result.json"
+            evidence_path.write_text('{"result":"PASS"}\n', encoding="utf-8")
+            test["evidence_ref"] = evidence_path.name
+            test["evidence_sha256"] = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+
+    config_path = root / "readiness-config.json"
+    receipt_path = root / "product-readiness-receipt.md"
+    config_path.write_text(
+        json.dumps(
+            {
+                "id": "PRODUCT-PR-001",
+                "target": design["target"],
+                "specificationBoundary": design["boundary"],
+                "verdict": "READY_FOR_TO_SPEC",
+                "assessedAt": "2025-01-01T00:05:00Z",
+                "sources": [{"path": "authority.md", "label": "Canonical product decision"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        ["node", str(PRODUCT_READINESS_SCRIPT), "create", "--config", str(config_path), "--output", str(receipt_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        raise AssertionError(completed.stderr or completed.stdout)
+    design["admission"].update(  # type: ignore[union-attr]
+        {
+            "ref": "product-readiness-receipt.md",
+            "version": "product-readiness-receipt/v1",
+            "verifier": "product-readiness-receipt/v1",
+            "content_sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
+        }
+    )
+
+    design_path = root / "design.json"
+    human_path = root / "design.md"
+    design_path.write_text(json.dumps(design, ensure_ascii=False, indent=2), encoding="utf-8")
+    human_path.write_text(human_design_text(design), encoding="utf-8")
+    return design_path, human_path
 
 
 class OperationalDataDesignTests(unittest.TestCase):
@@ -327,11 +453,8 @@ class OperationalDataDesignTests(unittest.TestCase):
         design = logical_ready_design()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            design_path = root / "operational-data-design.json"
-            human_path = root / "operational-data-design.md"
+            design_path, human_path = write_local_design_package(root, design)
             receipt_path = root / "data-design-receipt.md"
-            design_path.write_text(json.dumps(design, ensure_ascii=False, indent=2), encoding="utf-8")
-            human_path.write_text("# Design\n", encoding="utf-8")
             _, markdown = build_receipt(
                 design_path,
                 receipt_path,
@@ -358,8 +481,7 @@ class OperationalDataDesignTests(unittest.TestCase):
         ]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            design_path = root / "design.json"
-            design_path.write_text(json.dumps(design), encoding="utf-8")
+            design_path, _ = write_local_design_package(root, design)
             with self.assertRaises(ValueError):
                 build_receipt(design_path, root / "receipt.md", "READY_FOR_SPEC")
 
@@ -367,8 +489,7 @@ class OperationalDataDesignTests(unittest.TestCase):
         design = logical_ready_design()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            design_path = root / "design.json"
-            design_path.write_text(json.dumps(design), encoding="utf-8")
+            design_path, _ = write_local_design_package(root, design)
             completed = subprocess.run(
                 [
                     sys.executable,
@@ -415,11 +536,8 @@ class OperationalDataDesignTests(unittest.TestCase):
         design = logical_ready_design()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            design_path = root / "design.json"
-            human_path = root / "design.md"
+            design_path, human_path = write_local_design_package(root, design)
             receipt_path = root / "receipt.md"
-            design_path.write_text(json.dumps(design), encoding="utf-8")
-            human_path.write_text("# Design\n", encoding="utf-8")
             self.assertEqual(
                 0,
                 create_receipt_main(
@@ -455,11 +573,8 @@ class OperationalDataDesignTests(unittest.TestCase):
         design = logical_ready_design()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            design_path = root / "design.json"
-            human_path = root / "design.md"
+            design_path, human_path = write_local_design_package(root, design)
             receipt_path = root / "receipt.md"
-            design_path.write_text(json.dumps(design), encoding="utf-8")
-            human_path.write_text("# Design\n", encoding="utf-8")
             _, markdown = build_receipt(
                 design_path,
                 receipt_path,
@@ -558,11 +673,8 @@ class OperationalDataDesignTests(unittest.TestCase):
         design = logical_ready_design()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            design_path = root / "design.json"
-            human_path = root / "design.md"
+            design_path, human_path = write_local_design_package(root, design)
             receipt_path = root / "receipt.md"
-            design_path.write_text(json.dumps(design), encoding="utf-8")
-            human_path.write_text("# Design\n", encoding="utf-8")
             _, markdown = build_receipt(
                 design_path,
                 receipt_path,
@@ -584,11 +696,9 @@ class OperationalDataDesignTests(unittest.TestCase):
         design = logical_ready_design()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            design_path = root / "operational-data-design.json"
-            human_path = root / "operational-data-design.md"
+            design_path, human_path = write_local_design_package(root, design)
             receipt_path = root / "data-design-receipt.md"
-            design_path.write_text(json.dumps(design), encoding="utf-8")
-            human_path.write_text("# Operational design\n\nExact human companion.\n", encoding="utf-8")
+            human_path.write_text(human_design_text(design) + "\nExact human companion.\n", encoding="utf-8")
             record, markdown = build_receipt(
                 design_path,
                 receipt_path,
@@ -599,7 +709,7 @@ class OperationalDataDesignTests(unittest.TestCase):
             self.assertIn("source_authority_digests", record)
             receipt_path.write_text(markdown, encoding="utf-8")
             self.assertEqual("PASS", verify_receipt(receipt_path)["verdict"])
-            human_path.write_text("# Operational design\n\nChanged after acceptance.\n", encoding="utf-8")
+            human_path.write_text(human_design_text(design) + "\nChanged after acceptance.\n", encoding="utf-8")
             result = verify_receipt(receipt_path)
             self.assertEqual("FAIL", result["verdict"])
             self.assertIn("Human design SHA-256 does not match the immutable receipt.", result["errors"])
@@ -608,8 +718,7 @@ class OperationalDataDesignTests(unittest.TestCase):
         design = logical_ready_design()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            design_path = root / "design.json"
-            design_path.write_text(json.dumps(design), encoding="utf-8")
+            design_path, _ = write_local_design_package(root, design)
             with self.assertRaises(ValueError):
                 build_receipt(design_path, root / "receipt.md", "READY_FOR_SPEC")
 
@@ -617,11 +726,8 @@ class OperationalDataDesignTests(unittest.TestCase):
         design = logical_ready_design()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            design_path = root / "design.json"
-            human_path = root / "design.md"
+            design_path, human_path = write_local_design_package(root, design)
             receipt_path = root / "receipt.md"
-            design_path.write_text(json.dumps(design), encoding="utf-8")
-            human_path.write_text("# Design\n", encoding="utf-8")
             _, markdown = build_receipt(
                 design_path,
                 receipt_path,
@@ -753,6 +859,258 @@ class OperationalDataDesignTests(unittest.TestCase):
         design = logical_ready_design()
         del design["package_acceptance"]["accepted_by_ref"]  # type: ignore[index]
         self.assert_fails_with(design, "PACKAGE_ACCEPTANCE_DETAIL_MISSING", "READY_FOR_SPEC")
+
+    def test_39_blocker_rejects_unknown_gate_level(self) -> None:
+        design = logical_ready_design()
+        design["blocked_items"] = [
+            material(
+                "BLOCK-001",
+                classification="BLOCKED_PRODUCT_DECISION",
+                validation_status="BLOCKED",
+                blocks="NEITHER",
+            )
+        ]
+        self.assert_fails_with(design, "BLOCK_LEVEL_INVALID", "READY_FOR_SPEC")
+
+    def test_40_domain_enums_reject_arbitrary_strings(self) -> None:
+        design = logical_ready_design()
+        design["objects"][0]["content_mode"] = "BANANA"  # type: ignore[index]
+        self.assert_fails_with(design, "MATERIAL_ENUM_INVALID", "READY_FOR_SPEC")
+
+        design = logical_ready_design()
+        design["relationships"] = [
+            material(
+                "REL-001",
+                name="Work parent",
+                from_object_ref="OBJ-001",
+                to_object_ref="OBJ-001",
+                cardinality="BANANA",
+                ownership="Aggregate owned",
+                retention_behavior="Retain with Work",
+                invariant_refs=["INV-001"],
+                optional=True,
+            )
+        ]
+        self.assert_fails_with(design, "MATERIAL_ENUM_INVALID", "READY_FOR_SPEC")
+
+        design = logical_ready_design()
+        design["consistency_requirements"][0]["consistency_model"] = "BANANA"  # type: ignore[index]
+        self.assert_fails_with(design, "MATERIAL_ENUM_INVALID", "READY_FOR_SPEC")
+
+    def test_41_material_write_requires_execution_time_permission_revalidation(self) -> None:
+        design = logical_ready_design()
+        design["permission_checks"][0]["execution_time_revalidation"] = False  # type: ignore[index]
+        self.assert_fails_with(design, "EXECUTION_REVALIDATION_REQUIRED", "READY_FOR_SPEC")
+
+    def test_42_blocked_status_requires_a_real_blocker(self) -> None:
+        design = logical_ready_design()
+        design["status"] = "BLOCKED"
+        design["downstream_handoff"]["requested_gate"] = "READY_FOR_SPEC"  # type: ignore[index]
+        self.assert_fails_with(design, "BLOCKED_STATUS_WITHOUT_BLOCKER")
+
+    def test_43_inferred_gate_still_applies_quality_findings(self) -> None:
+        design = logical_ready_design()
+        design["quality_review"]["findings"] = [  # type: ignore[index]
+            {
+                "finding_id": "QUALITY-001",
+                "severity": "P2",
+                "status": "OPEN",
+                "affects_gate": "READY_FOR_SPEC",
+                "message": "The logical permission contract is incomplete.",
+            }
+        ]
+        self.assert_fails_with(design, "UNRESOLVED_QUALITY_FINDING")
+
+    def test_44_explicit_gate_must_match_handoff_gate_and_consumer(self) -> None:
+        design = logical_ready_design()
+        design["downstream_handoff"]["requested_gate"] = "READY_FOR_TICKETS"  # type: ignore[index]
+        self.assert_fails_with(design, "HANDOFF_GATE_MISMATCH", "READY_FOR_SPEC")
+
+        design = logical_ready_design()
+        design["downstream_handoff"]["consumer"] = "to-tickets"  # type: ignore[index]
+        self.assert_fails_with(design, "HANDOFF_CONSUMER_GATE_MISMATCH", "READY_FOR_SPEC")
+
+    def test_45_multiple_objects_require_an_explicit_relationship_model(self) -> None:
+        design = logical_ready_design()
+        second = copy.deepcopy(design["objects"][0])  # type: ignore[index]
+        second["stable_id"] = "OBJ-002"
+        second["name"] = "Update"
+        design["objects"].append(second)  # type: ignore[union-attr]
+        self.assert_fails_with(design, "RELATIONSHIP_MODEL_INCOMPLETE", "READY_FOR_SPEC")
+
+    def test_46_rejected_prototype_cannot_admit_design_items(self) -> None:
+        design = logical_ready_design()
+        design["prototype_evidence"] = [
+            {
+                "stable_id": "PROTO-001",
+                "ref": "prototype://feature/run-1",
+                "source_refs": ["AUTH-001"],
+                "admitted_ids": ["CMD-001"],
+                "review_status": "REJECTED",
+                "version": "run-1",
+                "manifest_ref": "prototype://manifest/run-1",
+                "manifest_sha256": "c" * 64,
+                "artifact_ref": "prototype://artifact/run-1",
+                "artifact_sha256": "d" * 64,
+                "fixture_ref": "prototype://fixture/run-1",
+                "fixture_sha256": "e" * 64,
+            }
+        ]
+        design["commands"][0]["source_refs"] = ["PROTO-001"]  # type: ignore[index]
+        self.assert_fails_with(design, "PROTOTYPE_NOT_ADMITTED", "READY_FOR_SPEC")
+
+    def test_47_unknown_physical_adapter_is_rejected(self) -> None:
+        design = physical_ready_design()
+        design["physical_adapters"][0]["adapter_kind"] = "MONGODB"  # type: ignore[index]
+        self.assert_fails_with(design, "PHYSICAL_ADAPTER_KIND_UNSUPPORTED", "READY_FOR_TICKETS")
+
+    def test_48_local_authority_anchor_must_exist(self) -> None:
+        design = logical_ready_design()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            authority_path = root / "decision.md"
+            authority_path.write_text("# Confirmed decision\n", encoding="utf-8")
+            design["source_authorities"][0]["ref"] = "decision.md#missing-heading"  # type: ignore[index]
+            design["source_authorities"][0]["content_sha256"] = __import__("hashlib").sha256(  # type: ignore[index]
+                authority_path.read_bytes()
+            ).hexdigest()
+            result = validate_design(design, "READY_FOR_SPEC", root / "design.json")
+        self.assertEqual("FAIL", result["verdict"])
+        self.assertIn("AUTHORITY_ANCHOR_NOT_FOUND", {finding["code"] for finding in result["findings"]})
+
+    def test_49_arbitrary_local_file_is_not_an_admission_receipt(self) -> None:
+        design = logical_ready_design()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            admission_path = root / "README.md"
+            admission_path.write_text("# Not a Product Readiness receipt\n", encoding="utf-8")
+            design["admission"].update(  # type: ignore[union-attr]
+                {
+                    "ref": "README.md",
+                    "content_sha256": __import__("hashlib").sha256(admission_path.read_bytes()).hexdigest(),
+                    "version": "product-readiness-receipt/v1",
+                    "verifier": "product-readiness-receipt/v1",
+                }
+            )
+            result = validate_design(design, "READY_FOR_SPEC", root / "design.json")
+        self.assertEqual("FAIL", result["verdict"])
+        self.assertIn("ADMISSION_VERIFICATION_FAILED", {finding["code"] for finding in result["findings"]})
+
+    def test_50_visible_receipt_tampering_is_detected(self) -> None:
+        design = logical_ready_design()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            design_path, human_path = write_local_design_package(root, design)
+            receipt_path = root / "receipt.md"
+            _, markdown = build_receipt(
+                design_path,
+                receipt_path,
+                "READY_FOR_SPEC",
+                human_design_path=human_path,
+            )
+            receipt_path.write_text(markdown.replace("- Gate: `READY_FOR_SPEC`", "- Gate: `READY_FOR_TICKETS`"), encoding="utf-8")
+            result = verify_receipt(receipt_path)
+        self.assertEqual("FAIL", result["verdict"])
+        self.assertIn("Receipt visible content does not match its machine identity.", result["errors"])
+
+    def test_51_future_receipt_timestamp_is_rejected(self) -> None:
+        design = logical_ready_design()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            design_path, human_path = write_local_design_package(root, design)
+            receipt_path = root / "receipt.md"
+            _, markdown = build_receipt(
+                design_path,
+                receipt_path,
+                "READY_FOR_SPEC",
+                human_design_path=human_path,
+            )
+            payload = markdown.split(BEGIN_MARKER, 1)[1].split(END_MARKER, 1)[0].strip()
+            record = json.loads(payload)
+            record["created_at"] = "2999-01-01T00:00:00Z"
+            tampered_payload = json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True)
+            receipt_path.write_text(
+                markdown.replace(payload, tampered_payload).replace(
+                    record.get("created_at", ""), "2999-01-01T00:00:00Z"
+                ),
+                encoding="utf-8",
+            )
+            result = verify_receipt(receipt_path)
+        self.assertEqual("FAIL", result["verdict"])
+        self.assertIn("Receipt created_at is in the future.", result["errors"])
+
+    def test_52_physical_gate_requires_executed_test_evidence(self) -> None:
+        design = physical_ready_design()
+        for field in ("evidence_ref", "evidence_sha256", "runner", "run_at", "result"):
+            del design["contract_tests"][1][field]  # type: ignore[index]
+        self.assert_fails_with(design, "PHYSICAL_TEST_EVIDENCE_MISSING", "READY_FOR_TICKETS")
+
+    def test_53_core_write_safety_contracts_cannot_be_waived(self) -> None:
+        for collection in ("state_transitions", "idempotency_contracts", "unknown_outcome_contracts"):
+            design = logical_ready_design()
+            design[collection][0]["validation_status"] = "NOT_APPLICABLE"  # type: ignore[index]
+            self.assert_fails_with(design, "CRITICAL_LOGICAL_AREA_NOT_ACTIVE", "READY_FOR_SPEC")
+
+    def test_54_transaction_and_retry_modes_use_closed_safety_enums(self) -> None:
+        design = logical_ready_design()
+        design["transaction_boundaries"][0]["atomicity_mode"] = "BEST_EFFORT"  # type: ignore[index]
+        self.assert_fails_with(design, "MATERIAL_ENUM_INVALID", "READY_FOR_SPEC")
+
+        design = logical_ready_design()
+        design["unknown_outcome_contracts"][0]["retry_mode"] = "BLIND_AUTOMATIC_RETRY"  # type: ignore[index]
+        self.assert_fails_with(design, "MATERIAL_ENUM_INVALID", "READY_FOR_SPEC")
+
+    def test_55_physical_category_must_cover_its_specific_contract(self) -> None:
+        design = physical_ready_design()
+        design["contract_tests"][1]["covers"].remove("PERM-001")  # type: ignore[index]
+        self.assert_fails_with(design, "PHYSICAL_TEST_CATEGORY_TARGET_MISMATCH", "READY_FOR_TICKETS")
+
+    def test_56_admission_and_data_design_use_the_same_authority_set(self) -> None:
+        design = logical_ready_design()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            design_path, _ = write_local_design_package(root, design)
+            replacement = root / "replacement-authority.md"
+            replacement.write_text("# Replacement authority\n", encoding="utf-8")
+            design["source_authorities"][0].update(  # type: ignore[index]
+                {
+                    "ref": replacement.name,
+                    "content_sha256": hashlib.sha256(replacement.read_bytes()).hexdigest(),
+                }
+            )
+            result = validate_design(design, "READY_FOR_SPEC", design_path)
+        self.assertEqual("FAIL", result["verdict"])
+        self.assertIn("ADMISSION_AUTHORITY_SET_MISMATCH", {finding["code"] for finding in result["findings"]})
+
+    def test_57_ready_status_cannot_claim_a_weaker_handoff_gate(self) -> None:
+        design = physical_ready_design()
+        design["downstream_handoff"].update(  # type: ignore[union-attr]
+            {"requested_gate": "READY_FOR_SPEC", "consumer": "to-spec"}
+        )
+        self.assert_fails_with(design, "DESIGN_STATUS_HANDOFF_MISMATCH")
+
+    def test_58_malformed_receipt_reports_missing_identity_without_crashing(self) -> None:
+        design = logical_ready_design()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            design_path, human_path = write_local_design_package(root, design)
+            receipt_path = root / "receipt.md"
+            _, markdown = build_receipt(
+                design_path,
+                receipt_path,
+                "READY_FOR_SPEC",
+                human_design_path=human_path,
+            )
+            payload = markdown.split(BEGIN_MARKER, 1)[1].split(END_MARKER, 1)[0].strip()
+            record = json.loads(payload)
+            del record["design_id"]
+            receipt_path.write_text(
+                markdown.replace(payload, json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True)),
+                encoding="utf-8",
+            )
+            result = verify_receipt(receipt_path)
+        self.assertEqual("FAIL", result["verdict"])
+        self.assertIn("Receipt required field is missing: design_id.", result["errors"])
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Delivery Track
 
-Teach the learner to preserve confirmed product authority while moving through specification, ticketing, implementation, testing, review, and visible parity.
+Teach the learner to preserve confirmed product authority while moving through operational data design when applicable, specification, ticketing, implementation, testing, review, and visible parity.
 
 ## DL-01: Verify the specification boundary
 
@@ -19,6 +19,26 @@ Teach the learner to preserve confirmed product authority while moving through s
 **Feedback focus:** Catch stale or mismatched receipts, copied unrelated context, and unresolved decisions hidden as defaults.
 
 **Advance when:** The boundary is traceable to current authority and contains no unsupported product choice.
+
+**Next:** `DL-01A`
+
+## DL-01A: Validate an operational data contract
+
+**Outcome:** The learner can decide whether persisted business state requires the operational data-design stage and distinguish its logical and physical gates.
+
+**Concept:** Product Readiness admits product behavior. `data-design` derives a database-neutral logical contract before specification and, when database implementation tickets are needed, a verified physical adapter and migration contract. It does not invent product policy or use analytics models as an operational source of truth.
+
+**Skill practice:** Invoke `data-design` for the admitted Task rename scenario. Produce a logical package and explain what additional evidence would be required for `READY_FOR_TICKETS`.
+
+**Learner action:** Create `learner-artifacts/delivery-operational-data-contract.md` with the admitted receipt identity, Task object identity, rename command, invariant, transaction and permission boundary, consistency and idempotency behavior, failure and unknown-result behavior, stable contract IDs, logical validator result, and the explicit physical-gate boundary.
+
+**Evidence:** `learner-artifacts/delivery-operational-data-contract.md`
+
+**Hint ladder:** Ask whether the feature persists authoritative business state. Provide the logical contract categories. Demonstrate why a table name, prototype JSON, dbt model, or RLS policy cannot define the product contract.
+
+**Feedback focus:** Catch invented product behavior, missing execution-time authorization, unbounded retries, fake versions, physical choices inside the logical model, and a claimed receipt without verifier evidence.
+
+**Advance when:** The package traces every material contract to admitted authority, passes the logical gate, and states what remains before physical database tickets.
 
 **Next:** `DL-02`
 

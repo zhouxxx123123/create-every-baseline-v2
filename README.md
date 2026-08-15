@@ -110,8 +110,16 @@ $learn-baseline
       +--> technical-spike ---+
       |
       v
+业务数据逻辑合同（存在持久业务状态时）
+  data-design: READY_FOR_SPEC
+      |
+      v
 形成规格
   to-spec
+      |
+      v
+物理适配与迁移合同（需要数据库实施任务时）
+  data-design: READY_FOR_TICKETS
       |
       v
 拆分实施任务
@@ -129,14 +137,15 @@ $learn-baseline
 关键约束：
 
 1. `research`、`prototype` 和 `technical-spike` 是有明确返回位置的 detour，不替代产品决定。
-2. `product-readiness` 只审查一个有界目标；没有有效的 `READY_FOR_TO_SPEC` receipt 时，不应进入 `to-spec`。
-3. `to-spec` 只综合已经确认的上下文，不负责补做产品发现。
-4. `to-tickets` 只拆分已经批准的规格，不把未决产品问题隐藏进实施任务。
-5. `implement` 一次只执行一个当前可开始的任务，并保持规格、证据和测试的追溯关系。
+2. `product-readiness` 只审查一个有界目标；没有有效的 `READY_FOR_TO_SPEC` receipt 时，不应进入后续阶段。
+3. 目标会持久化业务状态时，`data-design` 在 `to-spec` 前验证逻辑合同，在数据库实施 ticket 前验证物理适配和迁移合同。
+4. `to-spec` 只综合已经确认的上下文和已验证的数据合同，不负责补做产品发现。
+5. `to-tickets` 只拆分已经批准的规格，不把未决产品问题或未验证的数据架构隐藏进实施任务。
+6. `implement` 一次只执行一个当前可开始的任务，并保持规格、证据和测试的追溯关系。
 
 ## Skill 目录
 
-当前仓库包含 35 个有效 Skill。
+当前仓库包含 36 个有效 Skill。
 
 ### 初始化与导航
 
@@ -159,6 +168,7 @@ $learn-baseline
 | `prototype` | 用可丢弃原型回答状态、交互、流程或视觉问题 |
 | `pre-prd-hardening` | 在最终 readiness gate 前加固大型或仍有歧义的产品上下文 |
 | `product-readiness` | 检查有界产品范围是否具备进入 `to-spec` 的决定与证据 |
+| `data-design` | 将已准入的产品行为转成可验证的业务对象、状态、写入安全、物理适配和迁移合同 |
 | `technical-spike` | 用最小安全实验验证一个可能改变产品或规格的技术不确定性 |
 
 ### 规格与交付

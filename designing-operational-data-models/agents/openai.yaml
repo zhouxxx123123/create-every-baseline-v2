@@ -1,7 +1,0 @@
-interface:
-  display_name: "Business Data Design Center"
-  short_description: "Create validated operational data contracts"
-  default_prompt: "Use $designing-operational-data-models to turn confirmed product decisions into a validated operational data design."
-
-policy:
-  allow_implicit_invocation: false

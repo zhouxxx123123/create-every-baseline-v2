@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,9 +16,9 @@ from typing import Any
 from validate_operational_data_design import VALIDATOR_VERSION, validate_design
 
 
-RECEIPT_SCHEMA_VERSION = "1.1"
-BEGIN_MARKER = "<!-- OPERATIONAL_DATA_DESIGN_RECEIPT_V1_BEGIN"
-END_MARKER = "OPERATIONAL_DATA_DESIGN_RECEIPT_V1_END -->"
+RECEIPT_SCHEMA_VERSION = "1.2"
+BEGIN_MARKER = "<!-- OPERATIONAL_DATA_DESIGN_RECEIPT_V2_BEGIN"
+END_MARKER = "OPERATIONAL_DATA_DESIGN_RECEIPT_V2_END -->"
 
 
 def _sha256(payload: bytes) -> str:
@@ -29,6 +30,64 @@ def _relative_or_absolute(target: Path, base: Path) -> str:
         return os.path.relpath(target.resolve(), base.resolve()).replace("\\", "/")
     except ValueError:
         return str(target.resolve())
+
+
+def build_receipt_id(record: dict[str, Any]) -> str:
+    identity = {key: value for key, value in record.items() if key != "receipt_id"}
+    digest = _sha256(json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+    return f"{record.get('design_id')}:{record.get('gate')}:{digest[:24]}"
+
+
+def render_receipt(record: dict[str, Any]) -> str:
+    machine = json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True)
+    return (
+        f"# Operational data design receipt: {record.get('design_id')}\n\n"
+        f"- Receipt: `{record.get('receipt_id')}`\n"
+        f"- Gate: `{record.get('gate')}`\n"
+        f"- Target: {record.get('target')}\n"
+        f"- Created: `{record.get('created_at')}`\n"
+        f"- Design SHA-256: `{record.get('design_sha256')}`\n\n"
+        f"- Human design SHA-256: `{record.get('human_design_sha256')}`\n\n"
+        "This receipt binds the exact machine contract and human companion bytes present when the machine contract passed the named validator gate. "
+        "It is workflow evidence, not product authority, and must not be edited in place.\n\n"
+        f"{BEGIN_MARKER}\n{machine}\n{END_MARKER}\n"
+    )
+
+
+def _validate_human_companion(human_raw: bytes, design: dict[str, Any]) -> None:
+    try:
+        text = human_raw.decode("utf-8")
+    except UnicodeError as error:
+        raise ValueError(f"The human design companion must be UTF-8: {error}") from error
+    if re.search(r"\b(?:TBD|TODO|FIXME|PLACEHOLDER)\b", text, flags=re.IGNORECASE):
+        raise ValueError("The human design companion contains unresolved placeholder text.")
+    required_tokens = {str(design.get("design_id") or ""), str(design.get("target") or "")}
+    for collection in (
+        "objects",
+        "relationships",
+        "invariants",
+        "state_transitions",
+        "commands",
+        "transaction_boundaries",
+        "permission_checks",
+        "consistency_requirements",
+        "idempotency_contracts",
+        "unknown_outcome_contracts",
+        "physical_adapters",
+        "migration_requirements",
+        "contract_tests",
+        "blocked_items",
+    ):
+        required_tokens.update(
+            str(item["stable_id"])
+            for item in design.get(collection, [])
+            if isinstance(item, dict)
+            and isinstance(item.get("stable_id"), str)
+            and item.get("validation_status") != "NOT_APPLICABLE"
+        )
+    missing = sorted(token for token in required_tokens if token and token not in text)
+    if missing:
+        raise ValueError(f"The human design companion is missing machine-contract identities: {', '.join(missing)}")
 
 
 def build_receipt(
@@ -49,6 +108,7 @@ def build_receipt(
     human_raw = human_design_path.read_bytes()
     if not human_raw.strip():
         raise ValueError("The human design companion must not be empty.")
+    _validate_human_companion(human_raw, design)
 
     source_authority_ids = sorted(
         item["stable_id"]
@@ -64,10 +124,8 @@ def build_receipt(
     }
     digest = _sha256(raw)
     human_digest = _sha256(human_raw)
-    receipt_id = f"{design['design_id']}:{gate}:{digest[:12]}:{human_digest[:12]}"
     record = {
         "receipt_schema_version": RECEIPT_SCHEMA_VERSION,
-        "receipt_id": receipt_id,
         "created_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "gate": gate,
         "validator_version": VALIDATOR_VERSION,
@@ -84,19 +142,8 @@ def build_receipt(
         "quality_review": design.get("quality_review"),
         "package_acceptance": design.get("package_acceptance"),
     }
-    machine = json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True)
-    markdown = (
-        f"# Operational data design receipt: {record['design_id']}\n\n"
-        f"- Receipt: `{record['receipt_id']}`\n"
-        f"- Gate: `{gate}`\n"
-        f"- Target: {record['target']}\n"
-        f"- Created: `{record['created_at']}`\n"
-        f"- Design SHA-256: `{digest}`\n\n"
-        f"- Human design SHA-256: `{human_digest}`\n\n"
-        "This receipt binds the exact machine contract and human companion bytes present when the machine contract passed the named validator gate. "
-        "It is workflow evidence, not product authority, and must not be edited in place.\n\n"
-        f"{BEGIN_MARKER}\n{machine}\n{END_MARKER}\n"
-    )
+    record["receipt_id"] = build_receipt_id(record)
+    markdown = render_receipt(record)
     return record, markdown
 
 

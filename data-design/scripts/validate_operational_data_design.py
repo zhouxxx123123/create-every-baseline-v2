@@ -7,17 +7,18 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import unquote, urlparse
 
 
-VALIDATOR_VERSION = "1.1.0"
-SCHEMA_VERSION = "1.1"
+VALIDATOR_VERSION = "1.2.0"
+SCHEMA_VERSION = "1.2"
 
 CLASSIFICATIONS = {
     "DERIVED_FROM_AUTHORITY",
@@ -79,10 +80,13 @@ LOGICAL_BEHAVIOR_COLLECTIONS = (
 CRITICAL_LOGICAL_COLLECTIONS = (
     "objects",
     "invariants",
+    "state_transitions",
     "commands",
     "transaction_boundaries",
     "permission_checks",
     "consistency_requirements",
+    "idempotency_contracts",
+    "unknown_outcome_contracts",
     "contract_tests",
 )
 NOT_APPLICABLE_ALLOWED = {
@@ -100,6 +104,36 @@ PHYSICAL_TEST_CATEGORIES = {
     "RECOVERY",
     "MIGRATION",
     "ADAPTER",
+}
+CONTENT_MODES = {"STORED", "REFERENCED", "HYBRID"}
+CARDINALITIES = {"ONE_TO_ONE", "ONE_TO_MANY", "MANY_TO_ONE", "MANY_TO_MANY"}
+CONSISTENCY_MODELS = {
+    "IMMEDIATE",
+    "OPTIMISTIC_CAS",
+    "SERIALIZABLE",
+    "EVENTUAL",
+    "EXTERNAL_AUTHORITY",
+}
+SUPPORTED_ADAPTER_KINDS = {"POSTGRESQL", "SUPABASE"}
+PROTOTYPE_REVIEW_STATUSES = {"PENDING", "ADMITTED", "REJECTED"}
+SUPPORTED_ADMISSION_VERIFIER = "product-readiness-receipt/v1"
+MATERIAL_ENUMS: dict[tuple[str, str], set[str]] = {
+    ("objects", "content_mode"): CONTENT_MODES,
+    ("relationships", "cardinality"): CARDINALITIES,
+    ("consistency_requirements", "consistency_model"): CONSISTENCY_MODELS,
+    ("transaction_boundaries", "atomicity_mode"): {"ATOMIC", "SAGA", "EXTERNAL_NON_ATOMIC"},
+    ("transaction_boundaries", "partial_success_mode"): {"NONE", "RECORDED_AND_RECOVERABLE", "COMPENSATED"},
+    ("unknown_outcome_contracts", "retry_mode"): {"VERIFY_THEN_RETRY", "NO_AUTOMATIC_RETRY", "MANUAL_RECOVERY"},
+    ("contract_tests", "test_level"): {"LOGICAL", "PHYSICAL", "END_TO_END"},
+    ("blocked_items", "blocks"): BLOCK_LEVELS,
+}
+PHYSICAL_CATEGORY_TARGETS: dict[str, set[str]] = {
+    "CONSTRAINT": {"invariants"},
+    "CONCURRENCY": {"commands", "consistency_requirements"},
+    "PERMISSION": {"permission_checks"},
+    "RECOVERY": {"idempotency_contracts", "unknown_outcome_contracts"},
+    "MIGRATION": {"migration_requirements"},
+    "ADAPTER": {"physical_adapters"},
 }
 STABLE_ID_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9._:-]{2,127}$")
 SHA256_PATTERN = re.compile(r"^[a-fA-F0-9]{64}$")
@@ -154,7 +188,7 @@ MATERIAL_SCHEMAS: dict[str, dict[str, tuple[str, ...]]] = {
         ),
     },
     "transaction_boundaries": {
-        "strings": ("name", "atomicity", "partial_success_policy"),
+        "strings": ("name", "atomicity_mode", "atomicity", "partial_success_mode", "partial_success_policy"),
         "lists": ("command_refs", "writes"),
         "optional_lists": ("external_effects",),
     },
@@ -187,6 +221,7 @@ MATERIAL_SCHEMAS: dict[str, dict[str, tuple[str, ...]]] = {
             "authoritative_source",
             "verification_method",
             "retry_policy",
+            "retry_mode",
             "resolution_fact",
         ),
         "lists": ("command_refs",),
@@ -258,13 +293,22 @@ def _duplicates(values: Iterable[str]) -> list[str]:
 
 
 def _valid_timestamp(value: Any) -> bool:
+    return _parse_timestamp(value) is not None
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
     if not _nonempty(value):
-        return False
+        return None
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        return False
-    return parsed.tzinfo is not None
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _is_future_timestamp(value: Any) -> bool:
+    parsed = _parse_timestamp(value)
+    return parsed is not None and parsed > datetime.now(timezone.utc) + timedelta(minutes=5)
 
 
 def _is_active(item: dict[str, Any]) -> bool:
@@ -285,6 +329,31 @@ def _resolve_local_ref(ref: str, design_path: Path) -> Path | None:
         if resolved.is_file():
             return resolved
     return None
+
+
+def _markdown_anchor_exists(path: Path, ref: str) -> bool:
+    fragment = unquote(ref.split("#", 1)[1]).strip() if "#" in ref else ""
+    if not fragment:
+        return True
+    if path.suffix.lower() not in {".md", ".markdown"}:
+        return False
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
+    anchors: set[str] = set()
+    counts: Counter[str] = Counter()
+    for line in text.splitlines():
+        match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", line)
+        if not match:
+            continue
+        heading = re.sub(r"<[^>]+>", "", match.group(1)).strip().lower()
+        slug = re.sub(r"[^\w\- ]", "", heading, flags=re.UNICODE).replace(" ", "-")
+        slug = re.sub(r"-+", "-", slug).strip("-")
+        suffix = counts[slug]
+        counts[slug] += 1
+        anchors.add(slug if suffix == 0 else f"{slug}-{suffix}")
+    return fragment.lower() in anchors
 
 
 def _is_local_ref(ref: str) -> bool:
@@ -333,6 +402,7 @@ def validate_design(
 
     authority_ids: list[str] = []
     authority_status_by_id: dict[str, str] = {}
+    authority_currentness_times: list[datetime] = []
     for raw in _items(design.get("source_authorities")):
         if not isinstance(raw, dict):
             add("AUTHORITY_NOT_OBJECT", "P1", "Every source authority must be an object.")
@@ -359,20 +429,38 @@ def validate_design(
                 add("AUTHORITY_NOT_CURRENT", "P1", "Confirmed authority must be rechecked as CURRENT.", item_id=item_id)
             if not _valid_timestamp(raw.get("currentness_checked_at")):
                 add("AUTHORITY_CURRENTNESS_TIME_INVALID", "P1", "Confirmed authority requires a timezone-aware currentness_checked_at.", item_id=item_id)
+            elif _is_future_timestamp(raw.get("currentness_checked_at")):
+                add("AUTHORITY_CURRENTNESS_TIME_FUTURE", "P1", "Authority currentness check cannot be in the future.", item_id=item_id)
+            else:
+                parsed_currentness = _parse_timestamp(raw.get("currentness_checked_at"))
+                if parsed_currentness is not None:
+                    authority_currentness_times.append(parsed_currentness)
         ref = raw.get("ref")
-        if design_path is not None and _nonempty(ref) and _is_local_ref(ref):
-            resolved = _resolve_local_ref(ref, design_path)
-            if resolved is None:
-                add("AUTHORITY_REF_NOT_FOUND", "P1", f"Local authority reference does not exist: {ref}.", item_id=item_id)
-            elif isinstance(digest, str) and SHA256_PATTERN.fullmatch(digest):
-                actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
-                if actual.lower() != digest.lower():
-                    add("AUTHORITY_DIGEST_MISMATCH", "P1", "Local authority bytes do not match content_sha256.", item_id=item_id)
+        if design_path is not None and _nonempty(ref):
+            if not _is_local_ref(ref):
+                add("AUTHORITY_NOT_LOCALLY_VERIFIABLE", "P1", "Confirmed readiness authority must resolve to locally verifiable immutable bytes.", item_id=item_id)
+            else:
+                resolved = _resolve_local_ref(ref, design_path)
+                if resolved is None:
+                    add("AUTHORITY_REF_NOT_FOUND", "P1", f"Local authority reference does not exist: {ref}.", item_id=item_id)
+                else:
+                    if not _markdown_anchor_exists(resolved, ref):
+                        add("AUTHORITY_ANCHOR_NOT_FOUND", "P1", f"Authority anchor does not exist: {ref}.", item_id=item_id)
+                    if isinstance(digest, str) and SHA256_PATTERN.fullmatch(digest):
+                        try:
+                            actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
+                        except OSError as error:
+                            add("AUTHORITY_REF_UNREADABLE", "P1", f"Authority bytes cannot be read: {error}.", item_id=item_id)
+                        else:
+                            if actual.lower() != digest.lower():
+                                add("AUTHORITY_DIGEST_MISMATCH", "P1", "Local authority bytes do not match content_sha256.", item_id=item_id)
 
     if not authority_ids:
         add("NO_SOURCE_AUTHORITY", "P1", "At least one precise source authority is required.")
 
     prototype_ids: list[str] = []
+    prototype_review_by_id: dict[str, str] = {}
+    prototype_admitted_by_id: dict[str, set[str]] = {}
     for raw in _items(design.get("prototype_evidence")):
         if not isinstance(raw, dict):
             add("PROTOTYPE_NOT_OBJECT", "P1", "Every prototype evidence entry must be an object.")
@@ -382,24 +470,38 @@ def validate_design(
             add("PROTOTYPE_ID_INVALID", "P1", "Prototype stable_id is missing or invalid.", item_id=str(item_id))
             continue
         prototype_ids.append(item_id)
+        review_status = str(raw.get("review_status") or "")
+        prototype_review_by_id[item_id] = review_status
+        prototype_admitted_by_id[item_id] = set(_string_list(raw.get("admitted_ids")))
         for field in ("ref", "review_status", "version", "manifest_ref", "artifact_ref", "fixture_ref"):
             if not _nonempty(raw.get(field)):
                 add("PROTOTYPE_FIELD_MISSING", "P1", f"Prototype evidence requires {field}.", item_id=item_id, field=field)
         for field in ("manifest_sha256", "artifact_sha256", "fixture_sha256"):
             if not isinstance(raw.get(field), str) or not SHA256_PATTERN.fullmatch(raw[field]):
                 add("PROTOTYPE_DIGEST_INVALID", "P1", f"Prototype evidence requires a valid {field}.", item_id=item_id, field=field)
+        if review_status not in PROTOTYPE_REVIEW_STATUSES:
+            add("PROTOTYPE_REVIEW_STATUS_INVALID", "P1", f"Unsupported prototype review_status: {review_status!r}.", item_id=item_id)
+        if review_status != "ADMITTED" and _string_list(raw.get("admitted_ids")):
+            add("PROTOTYPE_NOT_ADMITTED", "P1", "Only an ADMITTED prototype may admit design item IDs.", item_id=item_id)
         if design_path is not None:
             for prefix in ("manifest", "artifact", "fixture"):
                 ref = raw.get(f"{prefix}_ref")
                 digest = raw.get(f"{prefix}_sha256")
-                if _nonempty(ref) and _is_local_ref(ref):
+                if _nonempty(ref):
+                    if not _is_local_ref(ref):
+                        add("PROTOTYPE_NOT_LOCALLY_VERIFIABLE", "P1", f"Prototype {prefix} must resolve to locally verifiable immutable bytes.", item_id=item_id)
+                        continue
                     resolved = _resolve_local_ref(ref, design_path)
                     if resolved is None:
                         add("PROTOTYPE_REF_NOT_FOUND", "P1", f"Local prototype {prefix} does not exist: {ref}.", item_id=item_id)
                     elif isinstance(digest, str) and SHA256_PATTERN.fullmatch(digest):
-                        actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
-                        if actual.lower() != digest.lower():
-                            add("PROTOTYPE_DIGEST_MISMATCH", "P1", f"Local prototype {prefix} bytes do not match {prefix}_sha256.", item_id=item_id)
+                        try:
+                            actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
+                        except OSError as error:
+                            add("PROTOTYPE_REF_UNREADABLE", "P1", f"Prototype {prefix} bytes cannot be read: {error}.", item_id=item_id)
+                        else:
+                            if actual.lower() != digest.lower():
+                                add("PROTOTYPE_DIGEST_MISMATCH", "P1", f"Local prototype {prefix} bytes do not match {prefix}_sha256.", item_id=item_id)
         if not _valid_string_list(raw.get("source_refs")):
             add("PROTOTYPE_SOURCE_REFS_MISSING", "P1", "Prototype evidence requires precise source_refs.", item_id=item_id)
         if not _valid_string_list(raw.get("admitted_ids")):
@@ -433,6 +535,8 @@ def validate_design(
             if collection == "blocked_items":
                 if classification not in BLOCKED_CLASSIFICATIONS:
                     add("BLOCKER_CLASSIFICATION_INVALID", "P1", "blocked_items must use a BLOCKED_* classification.", item_id=item_id)
+                if raw.get("blocks") not in BLOCK_LEVELS:
+                    add("BLOCK_LEVEL_INVALID", "P1", "A blocker must declare LOGICAL, PHYSICAL, or BOTH.", item_id=item_id)
                 if validation_status != "BLOCKED":
                     add("BLOCKER_STATUS_INVALID", "P1", "A blocker must use validation_status BLOCKED.", item_id=item_id)
             elif collection == "out_of_scope":
@@ -458,6 +562,11 @@ def validate_design(
                 add("UNKNOWN_SOURCE_REF", "P1", f"Unknown source reference: {ref}.", item_id=item_id)
             if ref == item_id:
                 add("SELF_SOURCE_REF", "P1", "A material item cannot cite itself as a source.", item_id=item_id)
+            if ref in prototype_review_by_id and (
+                prototype_review_by_id[ref] != "ADMITTED"
+                or item_id not in prototype_admitted_by_id.get(ref, set())
+            ):
+                add("PROTOTYPE_SOURCE_NOT_ADMITTED", "P1", "Material may cite prototype evidence only when that exact item ID was admitted.", item_id=item_id)
 
     for raw in _items(design.get("prototype_evidence")):
         if not isinstance(raw, dict):
@@ -488,11 +597,30 @@ def validate_design(
         if not _nonempty(handoff.get("consumer")):
             add("HANDOFF_CONSUMER_MISSING", "P2", "downstream_handoff.consumer is required.", field="downstream_handoff.consumer")
 
-    acceptance = _validate_acceptance(design.get("package_acceptance"), item_by_id, add)
-    quality_review = _validate_quality_review(design.get("quality_review"), required_gate, add)
-    _validate_admission(design.get("admission"), design_path, add)
+    gate = required_gate
+    if gate is None and isinstance(handoff, dict) and handoff.get("requested_gate") in GATES:
+        gate = handoff["requested_gate"]
+    if required_gate is not None and isinstance(handoff, dict) and handoff.get("requested_gate") != required_gate:
+        add("HANDOFF_GATE_MISMATCH", "P1", "The explicit validation gate must match downstream_handoff.requested_gate.", field="downstream_handoff.requested_gate")
+    if status in GATES and isinstance(handoff, dict) and handoff.get("requested_gate") != status:
+        add("DESIGN_STATUS_HANDOFF_MISMATCH", "P1", "A ready design status must equal downstream_handoff.requested_gate.", field="downstream_handoff.requested_gate")
+    if isinstance(handoff, dict) and gate in GATES:
+        expected_consumer = "to-spec" if gate == "READY_FOR_SPEC" else "to-tickets"
+        if handoff.get("consumer") != expected_consumer:
+            add("HANDOFF_CONSUMER_GATE_MISMATCH", "P1", f"{gate} requires downstream consumer {expected_consumer}.", field="downstream_handoff.consumer")
 
-    covered_by_level = _validate_contract_tests(design, item_by_id, collection_by_id, add)
+    acceptance = _validate_acceptance(design.get("package_acceptance"), item_by_id, design_path, add)
+    quality_review = _validate_quality_review(design.get("quality_review"), gate, design_path, add)
+    _validate_admission(design.get("admission"), design_path, design, add)
+
+    reviewed_at = _parse_timestamp(quality_review.get("reviewed_at"))
+    accepted_at = _parse_timestamp(acceptance.get("accepted_at"))
+    if reviewed_at is not None and authority_currentness_times and reviewed_at < max(authority_currentness_times):
+        add("QUALITY_REVIEW_PRECEDES_AUTHORITY_CHECK", "P1", "Quality review cannot predate the latest authority currentness check.")
+    if reviewed_at is not None and accepted_at is not None and accepted_at < reviewed_at:
+        add("PACKAGE_ACCEPTANCE_PRECEDES_REVIEW", "P1", "Package acceptance cannot predate the passing quality review.")
+
+    covered_by_level = _validate_contract_tests(design, item_by_id, collection_by_id, gate, design_path, add)
 
     selected_adapters = [
         adapter for adapter in _items(design.get("physical_adapters"))
@@ -502,6 +630,8 @@ def validate_design(
         add("MULTIPLE_PHYSICAL_ADAPTERS_SELECTED", "P2", "At most one physical adapter may be selected in a bounded package.")
     for adapter in selected_adapters:
         adapter_kind = str(adapter.get("adapter_kind") or "").upper()
+        if adapter_kind not in SUPPORTED_ADAPTER_KINDS:
+            add("PHYSICAL_ADAPTER_KIND_UNSUPPORTED", "P1", f"Unsupported operational adapter: {adapter_kind or '<missing>'}.", item_id=adapter.get("stable_id"))
         if adapter_kind == "DBT":
             add("ANALYTICS_ADAPTER_AS_OPERATIONAL_STORE", "P1", "dbt is an analytical handoff, not an operational physical adapter.", item_id=adapter.get("stable_id"))
         if adapter_kind == "SUPABASE":
@@ -514,9 +644,9 @@ def validate_design(
                 if collection_by_id.get(ref) != "permission_checks":
                     add("SUPABASE_PERMISSION_CONTRACT_REF_INVALID", "P1", f"Supabase permission ref is not a known permission check: {ref}.", item_id=adapter.get("stable_id"))
 
-    gate = required_gate
-    if gate is None and isinstance(handoff, dict) and handoff.get("requested_gate") in GATES:
-        gate = handoff["requested_gate"]
+    active_blockers = [item for item in _items(design.get("blocked_items")) if isinstance(item, dict)]
+    if status == "BLOCKED" and not active_blockers:
+        add("BLOCKED_STATUS_WITHOUT_BLOCKER", "P1", "A BLOCKED design must contain at least one explicit blocked item.", field="status")
 
     if status in GATES or required_gate is not None:
         _validate_readiness(
@@ -531,7 +661,7 @@ def validate_design(
             add,
         )
 
-    return _result(design, required_gate, findings)
+    return _result(design, gate, findings)
 
 
 def _validate_material_shape(collection: str, item: dict[str, Any], item_id: str, add: Any) -> None:
@@ -548,6 +678,11 @@ def _validate_material_shape(collection: str, item: dict[str, Any], item_id: str
     for field in schema.get("bools", ()):
         if not isinstance(item.get(field), bool):
             add("MATERIAL_FIELD_TYPE_INVALID", "P1", f"{collection}.{field} must be boolean.", item_id=item_id, field=field)
+    for (enum_collection, field), allowed in MATERIAL_ENUMS.items():
+        if enum_collection == collection and item.get(field) not in allowed:
+            add("MATERIAL_ENUM_INVALID", "P1", f"{collection}.{field} must be one of {sorted(allowed)}.", item_id=item_id, field=field)
+    if collection == "permission_checks" and item.get("execution_time_revalidation") is not True:
+        add("EXECUTION_REVALIDATION_REQUIRED", "P1", "Material write permission checks must be revalidated at execution time.", item_id=item_id, field="execution_time_revalidation")
 
 
 def _validate_typed_references(
@@ -589,7 +724,12 @@ def _validate_typed_references(
                     require(ref, expected, item_id, field)
 
 
-def _validate_acceptance(value: Any, item_by_id: dict[str, dict[str, Any]], add: Any) -> dict[str, Any]:
+def _validate_acceptance(
+    value: Any,
+    item_by_id: dict[str, dict[str, Any]],
+    design_path: Path | None,
+    add: Any,
+) -> dict[str, Any]:
     if not isinstance(value, dict):
         add("PACKAGE_ACCEPTANCE_MISSING", "P2", "package_acceptance must be an object.", field="package_acceptance")
         return {}
@@ -608,10 +748,20 @@ def _validate_acceptance(value: Any, item_by_id: dict[str, dict[str, Any]], add:
                 add("PACKAGE_ACCEPTANCE_DETAIL_MISSING", "P1", f"Accepted package requires {field}.", field=f"package_acceptance.{field}")
         if not _valid_timestamp(value.get("accepted_at")):
             add("PACKAGE_ACCEPTANCE_TIME_INVALID", "P1", "accepted_at must be timezone-aware ISO-8601.", field="package_acceptance.accepted_at")
+        elif _is_future_timestamp(value.get("accepted_at")):
+            add("PACKAGE_ACCEPTANCE_TIME_FUTURE", "P1", "accepted_at cannot be in the future.", field="package_acceptance.accepted_at")
+        _validate_local_evidence(
+            value,
+            ref_field="confirmation_ref",
+            digest_field="confirmation_sha256",
+            prefix="PACKAGE_ACCEPTANCE",
+            design_path=design_path,
+            add=add,
+        )
     return value
 
 
-def _validate_quality_review(value: Any, gate: str | None, add: Any) -> dict[str, Any]:
+def _validate_quality_review(value: Any, gate: str | None, design_path: Path | None, add: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         add("QUALITY_REVIEW_MISSING", "P1", "quality_review must be an object.", field="quality_review")
         return {}
@@ -632,20 +782,32 @@ def _validate_quality_review(value: Any, gate: str | None, add: Any) -> dict[str
             add("QUALITY_FINDING_SEVERITY_INVALID", "P1", "Quality finding severity is invalid.")
         if finding.get("status") not in {"OPEN", "RESOLVED", "ACCEPTED_RISK"}:
             add("QUALITY_FINDING_STATUS_INVALID", "P1", "Quality finding status is invalid.")
+        if finding.get("affects_gate") not in {*GATES, "BOTH"}:
+            add("QUALITY_FINDING_GATE_INVALID", "P1", "Quality finding affects_gate must name READY_FOR_SPEC, READY_FOR_TICKETS, or BOTH.")
         if finding.get("severity") == "P1" and finding.get("status") != "RESOLVED":
             add("P1_QUALITY_FINDING_PRESENT", "P1", "A P1 finding must be resolved; it cannot be accepted as risk for readiness.", item_id=finding.get("finding_id"))
         if finding.get("status") == "OPEN" and finding.get("severity") in {"P1", "P2"} and finding.get("affects_gate") in {gate, "BOTH"}:
             add("UNRESOLVED_QUALITY_FINDING", "P1", "Open P1/P2 quality finding blocks the requested gate.", item_id=finding.get("finding_id"))
     if value.get("status") == "PASSED":
-        for field in ("reviewed_by", "review_ref"):
+        for field in ("reviewed_by", "reviewed_by_ref", "review_ref"):
             if not _nonempty(value.get(field)):
                 add("QUALITY_REVIEW_DETAIL_MISSING", "P1", f"Passed review requires {field}.", field=f"quality_review.{field}")
         if not _valid_timestamp(value.get("reviewed_at")):
             add("QUALITY_REVIEW_TIME_INVALID", "P1", "reviewed_at must be timezone-aware ISO-8601.", field="quality_review.reviewed_at")
+        elif _is_future_timestamp(value.get("reviewed_at")):
+            add("QUALITY_REVIEW_TIME_FUTURE", "P1", "reviewed_at cannot be in the future.", field="quality_review.reviewed_at")
+        _validate_local_evidence(
+            value,
+            ref_field="review_ref",
+            digest_field="review_sha256",
+            prefix="QUALITY_REVIEW",
+            design_path=design_path,
+            add=add,
+        )
     return value
 
 
-def _validate_admission(value: Any, design_path: Path | None, add: Any) -> None:
+def _validate_admission(value: Any, design_path: Path | None, design: dict[str, Any], add: Any) -> None:
     if not isinstance(value, dict):
         add("ADMISSION_EVIDENCE_MISSING", "P1", "admission must identify the Product Readiness or project-declared gate.", field="admission")
         return
@@ -660,20 +822,113 @@ def _validate_admission(value: Any, design_path: Path | None, add: Any) -> None:
         add("ADMISSION_NOT_PASSED", "P1", "The upstream admission gate must have verdict PASS.", field="admission.verdict")
     ref = value.get("ref")
     digest = value.get("content_sha256")
-    if design_path is not None and _nonempty(ref) and _is_local_ref(ref):
-        resolved = _resolve_local_ref(ref, design_path)
-        if resolved is None:
-            add("ADMISSION_REF_NOT_FOUND", "P1", f"Local admission evidence does not exist: {ref}.", field="admission.ref")
-        elif isinstance(digest, str) and SHA256_PATTERN.fullmatch(digest):
+    if design_path is None or not _nonempty(ref):
+        return
+    if not _is_local_ref(ref):
+        add("ADMISSION_NOT_LOCALLY_VERIFIABLE", "P1", "Admission must reference a locally verifiable immutable receipt.", field="admission.ref")
+        return
+    resolved = _resolve_local_ref(ref, design_path)
+    if resolved is None:
+        add("ADMISSION_REF_NOT_FOUND", "P1", f"Local admission evidence does not exist: {ref}.", field="admission.ref")
+        return
+    if isinstance(digest, str) and SHA256_PATTERN.fullmatch(digest):
+        try:
             actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
-            if actual.lower() != digest.lower():
-                add("ADMISSION_DIGEST_MISMATCH", "P1", "Local admission evidence bytes do not match content_sha256.", field="admission.content_sha256")
+        except OSError as error:
+            add("ADMISSION_REF_UNREADABLE", "P1", f"Admission bytes cannot be read: {error}.", field="admission.ref")
+            return
+        if actual.lower() != digest.lower():
+            add("ADMISSION_DIGEST_MISMATCH", "P1", "Local admission evidence bytes do not match content_sha256.", field="admission.content_sha256")
+            return
+    if value.get("gate_kind") != "PRODUCT_READINESS_RECEIPT":
+        add("ADMISSION_VERIFIER_UNSUPPORTED", "P1", "Project-declared admission requires a registered verifier extension; the core validator cannot self-attest it.", field="admission.verifier")
+        return
+    if value.get("version") != SUPPORTED_ADMISSION_VERIFIER or value.get("verifier") != SUPPORTED_ADMISSION_VERIFIER:
+        add("ADMISSION_VERIFIER_UNSUPPORTED", "P1", f"Product Readiness admission requires {SUPPORTED_ADMISSION_VERIFIER}.", field="admission.verifier")
+        return
+    valid, summary = _run_product_readiness_verifier(resolved)
+    if not valid:
+        add("ADMISSION_VERIFICATION_FAILED", "P1", f"Product Readiness receipt verifier rejected the evidence: {summary}.", field="admission.ref")
+    elif isinstance(summary, dict) and summary.get("target") != design.get("target"):
+        add("ADMISSION_TARGET_MISMATCH", "P1", "Product Readiness receipt target does not match this data design target.", field="admission.ref")
+    elif isinstance(summary, dict):
+        receipt_sources = {
+            (resolved.parent / source["path"]).resolve()
+            for source in summary.get("checkedSources", [])
+            if isinstance(source, dict) and _nonempty(source.get("path")) and source.get("status") == "CURRENT"
+        }
+        design_sources = {
+            source_path.resolve()
+            for authority in _items(design.get("source_authorities"))
+            if isinstance(authority, dict)
+            and authority.get("authority_status") in CONFIRMED_AUTHORITY_STATUSES
+            and _nonempty(authority.get("ref"))
+            and _is_local_ref(authority["ref"])
+            and (source_path := _resolve_local_ref(authority["ref"], design_path)) is not None
+        }
+        if design_sources != receipt_sources:
+            add("ADMISSION_AUTHORITY_SET_MISMATCH", "P1", "Data-design authorities must equal the current canonical source set verified by Product Readiness.", field="source_authorities")
+
+
+def _validate_local_evidence(
+    value: dict[str, Any],
+    *,
+    ref_field: str,
+    digest_field: str,
+    prefix: str,
+    design_path: Path | None,
+    add: Any,
+) -> None:
+    digest = value.get(digest_field)
+    if not isinstance(digest, str) or not SHA256_PATTERN.fullmatch(digest):
+        add(f"{prefix}_DIGEST_INVALID", "P1", f"{digest_field} must be 64 hexadecimal characters.", field=digest_field)
+        return
+    if design_path is None:
+        return
+    ref = value.get(ref_field)
+    if not _nonempty(ref) or not _is_local_ref(ref):
+        add(f"{prefix}_NOT_LOCALLY_VERIFIABLE", "P1", f"{ref_field} must resolve to locally verifiable immutable bytes.", field=ref_field)
+        return
+    resolved = _resolve_local_ref(ref, design_path)
+    if resolved is None:
+        add(f"{prefix}_REF_NOT_FOUND", "P1", f"Evidence does not exist: {ref}.", field=ref_field)
+        return
+    try:
+        actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    except OSError as error:
+        add(f"{prefix}_REF_UNREADABLE", "P1", f"Evidence bytes cannot be read: {error}.", field=ref_field)
+        return
+    if actual.lower() != digest.lower():
+        add(f"{prefix}_DIGEST_MISMATCH", "P1", f"Evidence bytes do not match {digest_field}.", field=digest_field)
+
+
+def _run_product_readiness_verifier(receipt_path: Path) -> tuple[bool, dict[str, Any] | str]:
+    verifier_path = Path(__file__).resolve().parents[2] / "product-readiness" / "scripts" / "readiness-receipt.mjs"
+    if not verifier_path.is_file():
+        return False, f"registered verifier is missing: {verifier_path}"
+    try:
+        completed = subprocess.run(
+            ["node", str(verifier_path), "verify", str(receipt_path), "--json"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return False, str(error)
+    try:
+        summary = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return False, (completed.stderr or completed.stdout or f"exit {completed.returncode}").strip()
+    return completed.returncode == 0 and summary.get("valid") is True, summary
 
 
 def _validate_contract_tests(
     design: dict[str, Any],
     item_by_id: dict[str, dict[str, Any]],
     collection_by_id: dict[str, str],
+    gate: str | None,
+    design_path: Path | None,
     add: Any,
 ) -> dict[str, set[str]]:
     covered = {"LOGICAL": set(), "PHYSICAL": set(), "END_TO_END": set()}
@@ -684,6 +939,23 @@ def _validate_contract_tests(
         if level not in covered:
             add("CONTRACT_TEST_LEVEL_INVALID", "P1", "Contract test requires LOGICAL, PHYSICAL, or END_TO_END test_level.", item_id=test["stable_id"])
             continue
+        if gate == "READY_FOR_TICKETS" and level in {"PHYSICAL", "END_TO_END"}:
+            required_evidence = ("evidence_ref", "evidence_sha256", "runner", "run_at", "result")
+            if any(not _nonempty(test.get(field)) for field in required_evidence):
+                add("PHYSICAL_TEST_EVIDENCE_MISSING", "P1", "Physical readiness requires immutable executed-test evidence, runner, time, and result.", item_id=test["stable_id"])
+            else:
+                if test.get("result") != "PASS":
+                    add("PHYSICAL_TEST_RESULT_NOT_PASS", "P1", "Physical test evidence must record result PASS.", item_id=test["stable_id"])
+                if not _valid_timestamp(test.get("run_at")) or _is_future_timestamp(test.get("run_at")):
+                    add("PHYSICAL_TEST_TIME_INVALID", "P1", "Physical test run_at must be a non-future timezone-aware timestamp.", item_id=test["stable_id"])
+                _validate_local_evidence(
+                    test,
+                    ref_field="evidence_ref",
+                    digest_field="evidence_sha256",
+                    prefix="PHYSICAL_TEST",
+                    design_path=design_path,
+                    add=add,
+                )
         for target in _string_list(test.get("covers")):
             if target not in item_by_id:
                 add("CONTRACT_TEST_TARGET_UNKNOWN", "P1", f"Contract test covers unknown item: {target}.", item_id=test["stable_id"])
@@ -757,6 +1029,10 @@ def _validate_readiness(
         active = [item for item in _items(design.get(collection)) if isinstance(item, dict) and _is_active(item)]
         if not active:
             add("CRITICAL_LOGICAL_AREA_NOT_ACTIVE", "P1", f"Readiness requires active, validated {collection} material.", field=collection)
+    active_objects = [item for item in _items(design.get("objects")) if isinstance(item, dict) and _is_active(item)]
+    active_relationships = [item for item in _items(design.get("relationships")) if isinstance(item, dict) and _is_active(item)]
+    if len(active_objects) > 1 and not active_relationships:
+        add("RELATIONSHIP_MODEL_INCOMPLETE", "P1", "A design with multiple active business objects must explicitly model their relationships.", field="relationships")
     if acceptance.get("status") != "ACCEPTED":
         add("PACKAGE_NOT_ACCEPTED", "P1", "A readiness gate requires package-level user acceptance.")
     if quality_review.get("status") != "PASSED":
@@ -816,6 +1092,22 @@ def _validate_readiness(
     }
     for category in sorted(PHYSICAL_TEST_CATEGORIES - categories):
         add("PHYSICAL_TEST_CATEGORY_MISSING", "P1", f"Physical readiness lacks {category} test coverage.", field="contract_tests.coverage_categories")
+    for test in physical_tests:
+        target_collections = {
+            collection_by_id[target]
+            for target in _string_list(test.get("covers"))
+            if target in collection_by_id
+        }
+        for category in _string_list(test.get("coverage_categories")):
+            expected = PHYSICAL_CATEGORY_TARGETS.get(category)
+            if expected is not None and target_collections.isdisjoint(expected):
+                add(
+                    "PHYSICAL_TEST_CATEGORY_TARGET_MISMATCH",
+                    "P1",
+                    f"{category} evidence must cover at least one {sorted(expected)} contract.",
+                    item_id=test.get("stable_id"),
+                    field="coverage_categories",
+                )
     physical_covered = covered_by_level["PHYSICAL"] | covered_by_level["END_TO_END"]
     for item in [*selected, *migrations]:
         if _valid_id(item.get("stable_id")) and item["stable_id"] not in physical_covered:

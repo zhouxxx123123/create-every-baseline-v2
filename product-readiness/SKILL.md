@@ -135,6 +135,6 @@ Readiness receipt: <persisted link or `None`>
 Reason:
 ```
 
-When the verdict is `NOT_READY`, recommend exactly one next step. When it is `READY_FOR_TO_SPEC`, include the persisted receipt link and ask whether the user wants to continue to `to-spec`; do not invoke it silently.
+When the verdict is `NOT_READY`, recommend exactly one next step. When it is `READY_FOR_TO_SPEC`, include the persisted receipt link and determine whether the bounded target persists operational business state. If it does, offer `data-design` as the next stage and pass the exact receipt; if it does not, offer `to-spec`. Do not invoke either stage silently, and do not let Product Readiness invent the data contract.
 
 Do not infer the user's preferred answer from tone or phrasing. Product decisions belong to the user; discoverable facts belong to evidence.

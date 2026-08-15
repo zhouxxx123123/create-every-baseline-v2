@@ -93,6 +93,26 @@ Package acceptance names an ID that is not a `PROPOSED_ARCHITECTURE` item. It mu
 
 Remove a required timestamp or source digest, or change either the JSON or Markdown after receipt creation. Verification must fail. A receipt binds both exact design representations and does not authenticate modified bytes by status label alone.
 
+### T18 Invalid blocker level
+
+Add a formal blocker with `blocks: NEITHER`. It must fail with `BLOCK_LEVEL_INVALID`; an unknown value cannot evade either readiness gate.
+
+### T19 Admission substitution
+
+Replace the Product Readiness receipt with an arbitrary local file that has a correct digest, or change the data-design authority set after readiness. It must fail registered-verifier or authority-set validation.
+
+### T20 Closed safety contracts
+
+Use an unknown cardinality, content mode, consistency model, adapter, atomicity mode, partial-success mode, or retry mode. It must fail instead of treating an arbitrary string as a business or safety contract.
+
+### T21 Physical evidence semantics
+
+Declare all physical coverage categories on one test without immutable passing run evidence or without covering the matching permission, concurrency, recovery, constraint, migration, and adapter contracts. It must fail.
+
+### T22 Workflow-line integration
+
+For a persisted target, attempt `to-spec` without `READY_FOR_SPEC`, or database tickets without `READY_FOR_TICKETS`. The consumer must return to this skill. A non-persisted target records the stage as not applicable instead of creating a ceremonial package.
+
 ## Expected routing
 
 For each scenario, check:
