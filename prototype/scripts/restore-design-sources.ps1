@@ -123,7 +123,8 @@ foreach ($source in $lock.gitRepositories) {
 }
 
 if ($PlanOnly) {
-    Write-Output 'PLAN user-provided sources are verified, never downloaded or redistributed.'
+    Write-Output 'PLAN managed codex/apple-design Skills are verified at their installed paths.'
+    Write-Output "PLAN ChatGPT UI Kit remains on its official Figma source or an authorized local export."
     exit 0
 }
 
@@ -143,5 +144,5 @@ if ($AppleDesignSkillPath) {
 
 & $verifyScript @verifyArgs
 if ($LASTEXITCODE -ne 0) {
-    throw 'Design-source verification failed. Supply authorized user-provided sources and rerun.'
+    throw 'Design-source verification failed. Run the complete stack hot updater or repair the reported source identity.'
 }

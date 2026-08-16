@@ -4,7 +4,15 @@ Use this stack for WorkforceOS UI prototypes only. Product authority, the intera
 
 ## Portable restoration
 
-Treat [`design-sources.lock.json`](design-sources.lock.json) as the machine-readable source identity. Restore the public sources from their official repositories with:
+Treat [`design-sources.lock.json`](design-sources.lock.json) as the machine-readable source identity. Install or hot-update the complete stack with:
+
+```powershell
+& "<prototype-skill>\scripts\hot-update-prototype-stack.ps1" -WorkspaceRoot "<workspace>"
+```
+
+This installs the current `prototype`, `codex`, and `apple-design` Skill snapshots, restores all three pinned component repositories, and verifies every managed file. Existing Skill directories move to a timestamped recovery location before replacement; an installation failure restores them.
+
+After the Skill stack is installed, restore or verify only the public component sources with:
 
 ```powershell
 & "<prototype-skill>\scripts\restore-design-sources.ps1" -WorkspaceRoot "<workspace>"
@@ -18,9 +26,11 @@ Verify an existing installation with:
 & "<prototype-skill>\scripts\verify-design-sources.ps1" -WorkspaceRoot "<workspace>"
 ```
 
-The restore script never downloads or redistributes the ChatGPT Community `.fig`, `codex`, or `apple-design` Skill. Acquire those through an authorized source, place them at the recorded paths, and let the verifier confirm their SHA-256 identities. Use `-ChatGPTFigmaPath`, `-CodexSkillPath`, or `-AppleDesignSkillPath` when an authorized copy lives elsewhere. Use `-AllowMissingUserProvidedSources` only for a source-recovery pass that intentionally stops short of UI prototype work; the required preflight below still fails closed when a needed source is unavailable.
+The hot updater installs `codex` and `apple-design` from the controlled snapshots shipped with the Prototype Skill and verifies their complete registered file sets. Use `-CodexSkillRoot` or `-AppleDesignSkillRoot` only when Codex discovers Skills from a non-default location.
 
-Do not vendor the three Git repositories, raw `.fig`, or external Skill bodies into a public Prototype Skill package. Publish this lock, these scripts, and applicable license notices instead. A Git LFS pointer does not grant redistribution rights.
+The ChatGPT Community `.fig` stays at its official Figma source. The stack installation is complete with that registered remote reference; when a local authorized export is available, pass `-ChatGPTFigmaPath` and require its SHA-256 to match. A remote reference is sufficient to install the stack, but a UI build that must inspect components still stops if neither the live Figma file nor the registered export can be read.
+
+Do not vendor the three Git repositories or the raw `.fig` into the Prototype Skill. The updater restores Git sources from pinned official commits, bundles the two explicitly registered Skill snapshots, and preserves applicable third-party notices.
 
 ## Precedence
 
@@ -48,13 +58,15 @@ Use this source for app-shell-adjacent conversation UI, composers, project/tree 
 
 ### Codex visual system
 
-- Skill: resolve `codex-skill.defaultPathTemplate` from the lock, or use the explicitly supplied authorized path
+- Skill: resolve `codex-skill.installPathTemplate` from the lock
+- Distribution: controlled bundled snapshot with TypeUI MIT attribution
 
 Read the complete skill. Apply its blank-canvas restraint, typography-led hierarchy, minimal color, flat surfaces, concise writing, component-state completeness, and WCAG 2.2 AA requirements. Do not interpret minimalism as removing necessary context or affordances.
 
 ### Apple interaction and motion
 
-- Skill: resolve `apple-design-skill.defaultPathTemplate` from the lock, or use the explicitly supplied authorized path
+- Skill: resolve `apple-design-skill.installPathTemplate` from the lock
+- Distribution: controlled bundled snapshot under the repository's license
 
 Read the complete skill. Apply immediate feedback, spatial consistency, interruptibility, spring behavior, reduced-motion alternatives, platform familiarity, and accessibility. Use translucency, bounce, momentum, or gesture physics only when the bounded interaction benefits from them; they are not mandatory decoration.
 
@@ -90,7 +102,7 @@ Use for genuine indeterminate AI or agent activity only. Map the displayed state
 
 Before allocating or editing a UI version:
 
-1. Verify every local source path and fixed identity.
+1. Run the complete stack verifier and require all managed Skills and Git sources to pass. For Figma, require either the live source to be inspectable or the authorized export hash to pass.
 2. Read both design skills completely.
 3. Inspect the Figma components and the relevant sections of all three code sources.
 4. Record, for each source, `USED`, `INSPECTED_NOT_USED`, `CONFLICT_REJECTED`, or `SOURCE_UNAVAILABLE`.

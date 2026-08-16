@@ -82,6 +82,8 @@ For every WorkforceOS UI prototype mode (`EXPLORE_VERSIONS`, `REFINE_SELECTED`, 
 - the `apple-design` interaction and motion skill;
 - `transitions.dev`, `border-beam`, and `thinking-orbs`.
 
+If any managed Skill or component source is missing or mismatched, run `scripts/hot-update-prototype-stack.ps1` before the design preflight. Do not silently fall back to remembered style guidance.
+
 Inspect every source in the stack, but use a component or transition only when it truthfully serves the bounded interaction. Never add all sources decoratively, let a reference override product authority, or rewrite a frozen prototype artifact. Apply the stack to an existing prototype only through a newly allocated immutable refinement version.
 
 Record one source-application row per source as `USED`, `INSPECTED_NOT_USED`, `CONFLICT_REJECTED`, or `SOURCE_UNAVAILABLE`, with exact identity and the adopted or rejected pattern. The runnable artifact must remain independent from Figma; third-party runtime dependencies must be pinned and included in the immutable artifact contract.

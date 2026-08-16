@@ -20,7 +20,7 @@ if (-not (Test-Path -LiteralPath $resolvedRoot -PathType Container)) {
 
 function Get-DefaultUserPath {
     param([Parameter(Mandatory = $true)]$Source)
-    return [Environment]::ExpandEnvironmentVariables(($Source.defaultPathTemplate -replace '/', '\'))
+    return [Environment]::ExpandEnvironmentVariables(($Source.installPathTemplate -replace '/', '\'))
 }
 
 function Invoke-GitCapture {
@@ -42,13 +42,14 @@ function Test-FileIdentity {
         [Parameter(Mandatory = $true)][string]$Id,
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$ExpectedSha256,
-        [Parameter(Mandatory = $true)][bool]$CanBeMissing
+        [Parameter(Mandatory = $true)][bool]$CanBeMissing,
+        [string]$Kind = 'user-provided'
     )
 
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         return [ordered]@{
             id = $Id
-            kind = 'user-provided'
+            kind = $Kind
             status = $(if ($CanBeMissing) { 'MISSING_ALLOWED' } else { 'MISSING' })
             path = $Path
             expected = $ExpectedSha256
@@ -59,7 +60,7 @@ function Test-FileIdentity {
     $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash
     return [ordered]@{
         id = $Id
-        kind = 'user-provided'
+        kind = $Kind
         status = $(if ($actual -eq $ExpectedSha256) { 'PASS' } else { 'HASH_MISMATCH' })
         path = $Path
         expected = $ExpectedSha256
@@ -108,19 +109,32 @@ foreach ($source in $lock.gitRepositories) {
     })
 }
 
+foreach ($skill in $lock.managedSkills) {
+    $override = if ($skill.id -eq 'codex-skill') { $CodexSkillPath } elseif ($skill.id -eq 'apple-design-skill') { $AppleDesignSkillPath } else { $null }
+    $skillRoot = if ($override) { [System.IO.Path]::GetFullPath($override) } else { Get-DefaultUserPath $skill }
+    foreach ($file in $skill.files) {
+        $filePath = Join-Path $skillRoot ($file.path -replace '/', '\')
+        $results.Add((Test-FileIdentity -Id "$($skill.id):$($file.path)" -Path $filePath -ExpectedSha256 $file.sha256 -CanBeMissing $false -Kind 'managed-skill'))
+    }
+}
+
 $figSource = $lock.userProvidedSources | Where-Object id -eq 'chatgpt-ui-kit-community-fig'
 $figPath = if ($ChatGPTFigmaPath) { [System.IO.Path]::GetFullPath($ChatGPTFigmaPath) } else { Join-Path $resolvedRoot ($figSource.targetRelativePath -replace '/', '\') }
-$results.Add((Test-FileIdentity -Id $figSource.id -Path $figPath -ExpectedSha256 $figSource.sha256 -CanBeMissing $AllowMissingUserProvidedSources.IsPresent))
+if (-not (Test-Path -LiteralPath $figPath -PathType Leaf) -and $figSource.remoteReferenceMaySatisfyStackInstall) {
+    $results.Add([ordered]@{
+        id = $figSource.id
+        kind = 'remote-reference'
+        status = 'REMOTE_REFERENCE_REGISTERED'
+        path = $figPath
+        expected = $figSource.sha256
+        actual = $null
+        acquisitionUrl = $figSource.acquisitionUrl
+    })
+} else {
+    $results.Add((Test-FileIdentity -Id $figSource.id -Path $figPath -ExpectedSha256 $figSource.sha256 -CanBeMissing $AllowMissingUserProvidedSources.IsPresent))
+}
 
-$codexSource = $lock.userProvidedSources | Where-Object id -eq 'codex-skill'
-$resolvedCodexPath = if ($CodexSkillPath) { [System.IO.Path]::GetFullPath($CodexSkillPath) } else { Get-DefaultUserPath $codexSource }
-$results.Add((Test-FileIdentity -Id $codexSource.id -Path $resolvedCodexPath -ExpectedSha256 $codexSource.sha256 -CanBeMissing $AllowMissingUserProvidedSources.IsPresent))
-
-$appleSource = $lock.userProvidedSources | Where-Object id -eq 'apple-design-skill'
-$resolvedApplePath = if ($AppleDesignSkillPath) { [System.IO.Path]::GetFullPath($AppleDesignSkillPath) } else { Get-DefaultUserPath $appleSource }
-$results.Add((Test-FileIdentity -Id $appleSource.id -Path $resolvedApplePath -ExpectedSha256 $appleSource.sha256 -CanBeMissing $AllowMissingUserProvidedSources.IsPresent))
-
-$failed = @($results | Where-Object { $_.status -notin @('PASS', 'MISSING_ALLOWED') })
+$failed = @($results | Where-Object { $_.status -notin @('PASS', 'MISSING_ALLOWED', 'REMOTE_REFERENCE_REGISTERED') })
 $report = [ordered]@{
     sourceSetId = $lock.sourceSetId
     workspaceRoot = $resolvedRoot

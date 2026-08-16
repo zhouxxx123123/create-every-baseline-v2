@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sourceSetId": "workforceos-prototype-design-sources@2026-08-17",
-  "purpose": "Reconstruct the external design-reference stack used by the Prototype skill without redistributing restricted assets.",
+  "purpose": "Install and verify the complete Prototype design stack, while keeping the Figma Community export on its authorized source path.",
   "gitRepositories": [
     {
       "id": "transitions-dev",
@@ -33,6 +33,43 @@
       "publishedPackageIntegrity": "sha512-3BG1aeB1RUTxItCml/BBuIz5JRM4kZqGuyx+vouv0fXTtcR9ZNoKjWGneHPx94y74GxgArwJZ1qbJR5dt54kSw=="
     }
   ],
+  "managedSkills": [
+    {
+      "id": "codex-skill",
+      "kind": "CODEX_SKILL",
+      "bundleRelativePath": "bundled-skills/codex",
+      "installPathTemplate": "%USERPROFILE%/.codex/skills/codex",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "CFBAF5BC5CE1690DC58F5FB0DF4A0981889EE22E68FEE7D49E2CB81793A9B501"
+        },
+        {
+          "path": "DESIGN.md",
+          "sha256": "EC176BF5E0C421A4B04CB296D31D0B87128A2802F1AE3F9FE4D26AA63A5D029B"
+        }
+      ],
+      "upstream": "https://www.typeui.sh/design-skills/codex",
+      "upstreamPackage": "typeui.sh@0.7.1",
+      "license": "MIT",
+      "distributionPolicy": "BUNDLED_SNAPSHOT_WITH_UPSTREAM_ATTRIBUTION"
+    },
+    {
+      "id": "apple-design-skill",
+      "kind": "CODEX_SKILL",
+      "bundleRelativePath": "bundled-skills/apple-design",
+      "installPathTemplate": "%USERPROFILE%/.codex/skills/apple-design",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "sha256": "11840B24A11D7F94F39C6AAAB074750AE4E4DE4EF54EE4B1DD97E16EBD485E61"
+        }
+      ],
+      "upstream": "LOCAL_CONTROLLED_SNAPSHOT",
+      "license": "REPOSITORY_PROPRIETARY",
+      "distributionPolicy": "BUNDLED_CONTROLLED_SNAPSHOT"
+    }
+  ],
   "userProvidedSources": [
     {
       "id": "chatgpt-ui-kit-community-fig",
@@ -41,21 +78,8 @@
       "fileKey": "khXXA7rqerQEipLKEFbF2m",
       "targetRelativePath": "ChatGPT UI Kit, AI Chat (Community).fig",
       "sha256": "7CCE1327A962A152177250CF88810AF1232042A8E9524685F6B3667DE7965BD8",
-      "distributionPolicy": "DO_NOT_REDISTRIBUTE_WITHOUT_EXPLICIT_RIGHTS; USER_SUPPLIES_AUTHORIZED_EXPORT"
-    },
-    {
-      "id": "codex-skill",
-      "kind": "CODEX_SKILL",
-      "defaultPathTemplate": "%USERPROFILE%/.codex/skills/codex/SKILL.md",
-      "sha256": "CFBAF5BC5CE1690DC58F5FB0DF4A0981889EE22E68FEE7D49E2CB81793A9B501",
-      "distributionPolicy": "DO_NOT_REDISTRIBUTE_WITHOUT_CONFIRMED_RIGHTS; USER_SUPPLIES_AUTHORIZED_SKILL"
-    },
-    {
-      "id": "apple-design-skill",
-      "kind": "CODEX_SKILL",
-      "defaultPathTemplate": "%USERPROFILE%/.codex/skills/apple-design/SKILL.md",
-      "sha256": "11840B24A11D7F94F39C6AAAB074750AE4E4DE4EF54EE4B1DD97E16EBD485E61",
-      "distributionPolicy": "DO_NOT_REDISTRIBUTE_WITHOUT_CONFIRMED_RIGHTS; USER_SUPPLIES_AUTHORIZED_SKILL"
+      "distributionPolicy": "DO_NOT_REDISTRIBUTE_WITHOUT_EXPLICIT_RIGHTS; OPEN_THE_OFFICIAL_FIGMA_SOURCE_OR_SUPPLY_AN_AUTHORIZED_EXPORT",
+      "remoteReferenceMaySatisfyStackInstall": true
     }
   ]
 }
