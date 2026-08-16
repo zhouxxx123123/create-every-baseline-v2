@@ -84,6 +84,17 @@ function isPlaceholder(value) {
   );
 }
 
+function isNone(value) {
+  return /^(none|not applicable)$/i.test(stripFormatting(value));
+}
+
+function splitModuleIds(value) {
+  return stripFormatting(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function isOpaqueDisplayName(value) {
   const normalized = stripFormatting(value);
   if (/^(?:[A-Z]{1,3}|[A-Z]\d+[A-Z]?|\d+[A-Z]+)$/i.test(normalized)) {
@@ -273,6 +284,7 @@ function main() {
 
   const seenVersionIds = new Set();
   const seenReferences = new Set();
+  const composedVersions = [];
   for (const row of versionRows) {
     const versionId = row["Version ID"];
     const fullReference = row["Full prototype reference"];
@@ -304,6 +316,25 @@ function main() {
         errors.push(message);
       }
     }
+
+    const composedFrom = stripFormatting(row["Composed from"]);
+    if (!isPlaceholder(composedFrom) && !isNone(composedFrom)) {
+      const moduleIds = splitModuleIds(composedFrom);
+      const duplicateModuleIds = moduleIds.filter(
+        (moduleId, index) => moduleIds.indexOf(moduleId) !== index,
+      );
+      if (moduleIds.length === 0) {
+        errors.push(`Version ${versionId} has an empty Composed from module set.`);
+      }
+      for (const moduleId of new Set(duplicateModuleIds)) {
+        errors.push(`Version ${versionId} repeats Module ID '${moduleId}' in Composed from.`);
+      }
+      composedVersions.push({ row, moduleIds });
+    }
+  }
+
+  if (composedVersions.length > 0 && prototypeType !== "WORKFLOW") {
+    errors.push("Only a WORKFLOW prototype may declare Composed from modules.");
   }
 
   const canonicalRows = versionRows.filter(
@@ -358,6 +389,12 @@ function main() {
     parseTable(sections.get("Branch coverage") ?? "").rows,
     "Branch ID",
   );
+  const compositionContractBody = sections.get("Composition contract") ?? "";
+  const compositionContract = bulletFields(compositionContractBody);
+  const compositionInventoryRows = realRows(
+    parseTable(compositionContractBody).rows,
+    "Module ID",
+  );
   const compositionRows = realRows(
     parseTable(sections.get("Composition coverage") ?? "").rows,
     "Integrated ID",
@@ -378,6 +415,146 @@ function main() {
         errors.push(`${kind} coverage contains a placeholder ID.`);
       }
     }
+  }
+
+  if (composedVersions.length > 0) {
+    if (!sections.has("Composition contract")) {
+      errors.push("Composed prototype requires section: ## Composition contract");
+    }
+    const requestedModuleCount = Number.parseInt(
+      compositionContract.get("Requested module count") ?? "",
+      10,
+    );
+    if (!Number.isInteger(requestedModuleCount) || requestedModuleCount < 1) {
+      errors.push("Composition contract requires a positive integer Requested module count.");
+    }
+    for (const key of ["Integrated project", "Start command", "Formal integration URL"]) {
+      const value = compositionContract.get(key);
+      if (isPlaceholder(value) || isNone(value)) {
+        errors.push(`Composition contract requires one concrete '${key}'.`);
+      }
+    }
+    if (compositionInventoryRows.length === 0) {
+      errors.push("Composed prototype requires concrete Composition contract inventory rows.");
+    }
+
+    const inventoryByReference = new Map();
+    for (const row of compositionInventoryRows) {
+      const reference = stripFormatting(row["Full prototype reference"]);
+      const moduleId = stripFormatting(row["Module ID"]);
+      if (isPlaceholder(reference)) {
+        errors.push(`Composition Module ID '${moduleId}' lacks a full prototype reference.`);
+        continue;
+      }
+      if (!inventoryByReference.has(reference)) {
+        inventoryByReference.set(reference, []);
+      }
+      inventoryByReference.get(reference).push(row);
+
+      for (const key of [
+        "Requested capability",
+        "Source manifest",
+        "Source version",
+        "Artifact ref",
+        "Fixture ref",
+        "Integrated surface",
+      ]) {
+        if (isPlaceholder(row[key]) || isNone(row[key])) {
+          errors.push(`Composition Module ID '${moduleId}' requires '${key}'.`);
+        }
+      }
+      if (stripFormatting(row["Integrated count"]) !== "1") {
+        errors.push(`Composition Module ID '${moduleId}' must have Integrated count 1.`);
+      }
+      const runtimeCheck = stripFormatting(row["Runtime check"]);
+      if (!["PASS", "FAIL", "NOT_RUN"].includes(runtimeCheck)) {
+        errors.push(
+          `Composition Module ID '${moduleId}' has invalid Runtime check '${runtimeCheck}'.`,
+        );
+      }
+    }
+
+    for (const { row: version, moduleIds } of composedVersions) {
+      const reference = version["Full prototype reference"];
+      const inventory = inventoryByReference.get(reference) ?? [];
+      const seenModuleIds = new Set();
+      const seenSurfaces = new Set();
+      for (const item of inventory) {
+        const moduleId = stripFormatting(item["Module ID"]);
+        const surface = stripFormatting(item["Integrated surface"]);
+        if (seenModuleIds.has(moduleId)) {
+          errors.push(`Composition ${reference} repeats inventory Module ID '${moduleId}'.`);
+        }
+        seenModuleIds.add(moduleId);
+        if (!isPlaceholder(surface) && !isNone(surface)) {
+          if (seenSurfaces.has(surface)) {
+            errors.push(`Composition ${reference} repeats integrated surface '${surface}'.`);
+          }
+          seenSurfaces.add(surface);
+        }
+      }
+
+      const declaredSet = new Set(moduleIds);
+      const inventorySet = new Set(inventory.map((item) => stripFormatting(item["Module ID"])));
+      const coverageForReference = compositionRows.filter(
+        (item) => stripFormatting(item["Full prototype reference"]) === reference,
+      );
+      const coverageSet = new Set(
+        coverageForReference.map((item) => stripFormatting(item["Module ID"])),
+      );
+
+      if (Number.isInteger(requestedModuleCount) && inventory.length !== requestedModuleCount) {
+        errors.push(
+          `Composition ${reference} inventory has ${inventory.length} modules; expected ${requestedModuleCount}.`,
+        );
+      }
+      for (const moduleId of declaredSet) {
+        if (!inventorySet.has(moduleId)) {
+          errors.push(`Composition ${reference} declares missing inventory Module ID '${moduleId}'.`);
+        }
+      }
+      for (const moduleId of inventorySet) {
+        if (!declaredSet.has(moduleId)) {
+          errors.push(`Composition ${reference} inventory has undeclared Module ID '${moduleId}'.`);
+        }
+        if (!coverageSet.has(moduleId)) {
+          errors.push(`Composition ${reference} lacks coverage for Module ID '${moduleId}'.`);
+        }
+      }
+      for (const moduleId of coverageSet) {
+        if (!inventorySet.has(moduleId)) {
+          errors.push(`Composition ${reference} has orphan coverage Module ID '${moduleId}'.`);
+        }
+      }
+
+      const inventoryByModuleId = new Map(
+        inventory.map((item) => [stripFormatting(item["Module ID"]), item]),
+      );
+      for (const coverage of coverageForReference) {
+        const moduleId = stripFormatting(coverage["Module ID"]);
+        const expected = inventoryByModuleId.get(moduleId);
+        if (!expected) {
+          continue;
+        }
+        if (stripFormatting(coverage["Source manifest"]) !== stripFormatting(expected["Source manifest"])) {
+          errors.push(`Composition ${reference} Module ID '${moduleId}' source manifest mismatch.`);
+        }
+        if (stripFormatting(coverage["Source version"]) !== stripFormatting(expected["Source version"])) {
+          errors.push(`Composition ${reference} Module ID '${moduleId}' source version mismatch.`);
+        }
+      }
+    }
+
+    const composedReferences = new Set(
+      composedVersions.map(({ row }) => row["Full prototype reference"]),
+    );
+    for (const reference of inventoryByReference.keys()) {
+      if (!composedReferences.has(reference)) {
+        errors.push(`Composition inventory references non-composed version '${reference}'.`);
+      }
+    }
+  } else if (compositionInventoryRows.length > 0 || compositionRows.length > 0) {
+    errors.push("Non-composed prototype must not contain concrete composition rows.");
   }
 
   if (prototypeType === "WORKFLOW" && journeyRows.length === 0) {
@@ -431,6 +608,30 @@ function main() {
         errors.push(`Journey ${row["Step ID"]} is only DIRECT_STATE_ONLY.`);
       }
     }
+
+    const canonicalComposition = composedVersions.find(
+      ({ row }) => row["Full prototype reference"] === canonicalReference,
+    );
+    if (canonicalComposition) {
+      for (const row of compositionInventoryRows.filter(
+        (candidate) => candidate["Full prototype reference"] === canonicalReference,
+      )) {
+        const moduleId = row["Module ID"];
+        if (row["Runtime check"] !== "PASS") {
+          errors.push(`Composition Module ID '${moduleId}' is not runtime PASS.`);
+        }
+        if (isPlaceholder(row.Evidence) || isNone(row.Evidence)) {
+          errors.push(`Composition Module ID '${moduleId}' lacks runtime evidence.`);
+        }
+      }
+      for (const row of compositionRows.filter(
+        (candidate) => candidate["Full prototype reference"] === canonicalReference,
+      )) {
+        if (isPlaceholder(row.Evidence) || isNone(row.Evidence)) {
+          errors.push(`Composition coverage '${row["Integrated ID"]}' lacks evidence.`);
+        }
+      }
+    }
   }
 
   const downstream = bulletFields(sections.get("Downstream consumption") ?? "");
@@ -463,6 +664,7 @@ function main() {
     currentCanonical: canonical?.["Full prototype reference"] ?? null,
     reviewStatus: reviewStatus ?? null,
     coverageIds: seenCoverageIds.size,
+    compositionModules: compositionInventoryRows.length,
     warnings,
     errors,
     valid: errors.length === 0,

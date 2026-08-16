@@ -1,6 +1,6 @@
 ---
 name: prototype
-description: Build a throwaway prototype to answer a bounded design question. Use for state, component, logic, end-to-end UI workflow validation, or exact-once composition of several selected prototype modules into one runnable review surface before specification.
+description: Build a throwaway prototype to answer a bounded design question while preserving inherited workflow coverage. Use for state, component, logic, multi-board or end-to-end UI workflow validation, refinement of a selected prototype, or exact-once composition of several selected prototype modules into one runnable review surface before specification.
 ---
 
 # Prototype
@@ -17,6 +17,81 @@ Before building, record:
 - what the user must be able to observe or validate.
 
 Also record the affected product areas and the cross-functional handoff being tested: producer, consumer, shared object/event/action, source-of-truth owner, and expected result or writeback.
+
+## Preserve workflow coverage
+
+When the caller describes a full workflow, several product decisions, or a sequence of prototype boards, maintain an explicit end-to-end coverage ledger. A bounded prototype version may answer one question, but it must not lose sight of the originating workflow.
+
+Before allocating or changing a version:
+
+1. Read the originating scope, current formal authorities, the full manifest, every selected ancestor relevant to the current journey, and any existing coverage ledger.
+2. List the capabilities required by the originating workflow and classify each as `CONFIRMED_PRESENT`, `PRESENT_NOT_REVIEWED`, `PLACEHOLDER_ONLY`, `NOT_YET_PROTOTYPED`, `EXTERNAL_HANDOFF`, or `OUT_OF_SCOPE`.
+3. Name the current board or bounded question, the inherited confirmed capabilities that must remain present, downstream boards not yet built, and external boundaries.
+4. Report this preflight before building. If the required authority set or inherited behaviour cannot be resolved, stop rather than silently narrowing the product.
+
+Treat `CURRENT_CANONICAL` only as the currently selected immutable version. It does not mean that the originating workflow, all decisions, or the end-to-end product has been fully prototyped. Report selection status and end-to-end coverage status separately.
+
+For every refinement, compare the new candidate against the selected baseline. Any applicable confirmed capability that disappears, becomes unreachable, changes meaning, or turns into a no-op is a regression unless the user explicitly superseded it. Record deliberate exclusions; do not rely on inheritance wording alone.
+
+## Classify presentation and reference patterns
+
+For every capability in a multi-board or end-to-end workflow, classify how the target user encounters it before drawing UI:
+
+- `USER_VISIBLE`: the target user must inspect, understand, or operate it in the normal product surface;
+- `ROLE_RESTRICTED_VISIBLE`: a specific operator, administrator, reviewer, or governance role needs a product surface, but ordinary users do not;
+- `USER_TRIGGERED_BACKGROUND`: a user action starts it, while validation or processing happens behind the surface; show only the action, necessary progress, outcome, and recovery path;
+- `BACKGROUND_ONLY`: no ordinary product surface is required; expose only a concise exception or recovery state when user action is needed;
+- `NON_PRODUCT_METADATA`: prototype IDs, fixture IDs, Decision references, hashes, coverage status, and review controls stay outside the product canvas.
+
+Do not turn formal product rules into pages merely because they are important. Permission, scope, qualification, conflict, idempotency, atomicity, reconciliation, and other background contracts normally appear through enabled/disabled actions, short pending states, success or failure feedback, and recovery entry points—not internal verification checklists or interstitial screens. Use a role-restricted surface only when formal authority requires that role to inspect or decide the underlying facts.
+
+Also classify the need for external product reference:
+
+- `REFERENCE_REQUIRED`: the interaction is complex, unfamiliar, materially affects step count or comprehension, has several credible presentation models, or has already failed user review;
+- `REFERENCE_OPTIONAL`: a familiar control has a stable inherited pattern and only a light sanity check is useful;
+- `REFERENCE_NOT_APPLICABLE`: the capability is background-only or non-product metadata and no user-facing pattern is being chosen.
+
+Formal product authority decides capability identity, semantics, responsibility, permissions, lifecycle, and result. Customer evidence and the real workflow decide who must perceive or operate it. Selected prototype evidence constrains inherited interaction. Reference products inform presentation only and never override those sources.
+
+When reference is required, inspect one or more current, task-analogous first-party product sources; compare at least two when the alternatives would materially change the interaction. Record the exact pattern borrowed, source and access date, plus the product semantics, branding, data model, or implementation details explicitly not inherited. If no trustworthy reference can be inspected, stop before inventing an unfamiliar interaction.
+
+## Run the interaction-contract preflight only when needed
+
+Before drawing a new workflow interaction, connect the formal product behaviour to the experience the user will actually encounter. This is an internal preflight inside the prototype manifest, not a separate skill, authority, registry, validator, approval stage, or user deliverable.
+
+Choose the lightest sufficient depth:
+
+- `SKIP`: use only for a pure visual or copy refinement that does not change any actor, information source, fact authority, product identity, responsibility, permission, lifecycle, action, destination, formal result, external handoff, or visible/background classification. Record the reason and reuse the exact existing contract rows.
+- `DELTA`: the default for a new board or workflow step, new actor or role, new information source, new surface, new registered action, new destination, new external handoff, or any refinement that changes affected contract rows. Read and update only the affected rows.
+- `FULL`: use only for the first workflow mapping, a missing or materially stale contract, a material formal-authority change, or an unresolved cross-board conflict. Do not rerun a full audit merely because a new immutable prototype version is allocated.
+
+Read authority proportionally:
+
+1. Start from the repository-declared authority index, routing map, product baseline, or equivalent. Do not blindly scan every historical ticket.
+2. Read the exact current formal Product Decision answers and registered definitions that govern the affected capability. Follow repository rules that require a complete effective answer; do not rely on an old summary when the full answer is authoritative.
+3. Treat Context and glossary material as registered definitions and navigation; selected prototype evidence as an inherited interaction constraint; and Research, Technical Spikes, customer evidence, external standards, and reference products as evidence only.
+4. Extract only the affected business moments and preserve exact authority links and effectivity. Never reinterpret or silently extend a formal decision.
+5. If sources conflict or leave a material semantic choice unresolved, classify the gap instead of inventing an answer in UI.
+
+For each affected business moment, maintain one compact interaction-contract row with:
+
+- stable contract ID, trigger, actor, and the actor's job;
+- information needed, source, and fact authority;
+- presentation class and product surface or place;
+- each affordance and its named destination;
+- visible result and background behaviour;
+- formal outcome, failure and recovery path, and external handoff;
+- gap route and exact authority evidence.
+
+Use these gap routes:
+
+- `INHERITED_AUTHORITY`: existing formal authority answers the semantics. Report the inheritance briefly and proceed without asking the user to reconfirm it.
+- `PROTOTYPE_DECISION`: the formal behaviour is clear but the presentation or interaction model is not. Build candidate evidence and let the user confirm after seeing it; do not block before building.
+- `DOMAIN_FIXTURE_GAP`: exact domain content is missing. Ask before building only when that content materially changes the reviewed interaction; otherwise use an explicitly non-authoritative fixture and record the limitation outside the product canvas.
+- `TECHNICAL_GAP`: feasibility or implementation is unresolved. Keep it as a technical or external boundary; do not turn it into a product answer or visible internal machinery.
+- `PRODUCT_GAP`: product identity, responsibility, cardinality, permission, lifecycle, or formal result is unresolved. Stop the affected branch and return it to the repository's product-governance workflow.
+
+Do not ask for routine preflight approval. Consolidate all genuinely blocking ambiguity into one bounded question, and never ask the user to reconfirm inherited Product Decisions. Reference products may inform surfaces, hierarchy, controls, and step compression; they never decide WorkforceOS business semantics.
 
 ## Determine the prototype unit
 
@@ -80,6 +155,30 @@ Keep a manifest beside the prototype in the repository-declared format. If none 
 
 ## Decision sources
 <links to the exact product-baseline decision or other canonical decision being tested, plus relevant glossary terms, ADRs, or specs>
+
+## Interaction contract preflight
+- Depth: `SKIP | DELTA | FULL`
+- Reused contract: <exact manifest/version rows or `None`>
+- Blocking gap: <`None` or exact gap route and resume target>
+
+| Contract ID | Business moment / trigger | Actor and job | Information and fact authority | Presentation class and surface | Affordance -> destination | Visible result | Background behaviour | Formal outcome | Failure / recovery | External handoff | Gap route | Authority evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| <stable contract ID> | <when this interaction occurs> | <actor and job to be done> | <needed information, source, and authority> | <presentation class plus place> | <every visible action and named destination> | <observable feedback> | <non-visible processing> | <durable business result or `None`> | <failure state and recovery entry> | <handoff owner and boundary or `None`> | `INHERITED_AUTHORITY | PROTOTYPE_DECISION | DOMAIN_FIXTURE_GAP | TECHNICAL_GAP | PRODUCT_GAP` | <exact current authority links> |
+
+## End-to-end coverage
+- Intended workflow scope: <the originating full workflow, or `Not applicable`>
+- Current selected version: <full prototype reference, or `None`>
+- Coverage summary: <counts by coverage status>
+
+| Capability ID | Required capability | Authority source | Product surface or board | Current status | Evidence or preserved version | Next gate |
+| --- | --- | --- | --- | --- | --- | --- |
+| <stable capability ID> | <product capability, including visible and background behaviour> | <exact decision or authority> | <surface / PB / background / external system> | `CONFIRMED_PRESENT | PRESENT_NOT_REVIEWED | PLACEHOLDER_ONLY | NOT_YET_PROTOTYPED | EXTERNAL_HANDOFF | OUT_OF_SCOPE` | <current-version ID, preserved selected version, or `None`> | <review, later board, external contract, or `None`> |
+
+## Capability presentation contract
+
+| Capability ID | Presentation class | Target audience | User trigger | Visible result and recovery | Background behaviour | Reference need | Reference pattern and evidence | Semantic boundary |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| <stable capability ID from End-to-end coverage> | `USER_VISIBLE | ROLE_RESTRICTED_VISIBLE | USER_TRIGGERED_BACKGROUND | BACKGROUND_ONLY | NON_PRODUCT_METADATA` | <role or `System`> | <action or `None`> | <what the user sees, including failure recovery> | <what must happen without becoming a page> | `REFERENCE_REQUIRED | REFERENCE_OPTIONAL | REFERENCE_NOT_APPLICABLE` | <product, exact pattern, source, access date, or `None`> | <what was not inherited and which authority remains controlling> |
 
 ## In scope
 <pages, states, interactions, and prototype versions being tested>
@@ -161,6 +260,10 @@ Keep a manifest beside the prototype in the repository-declared format. If none 
 
 For `STATE` and `COMPONENT`, use only the coverage rows relevant to the bounded question and write `Not applicable` for journey fields. For `WORKFLOW`, the journey table is mandatory. For a non-composed version, write `None` under `Composed from` and `Not applicable` under `Composition contract`, `Composition coverage`, and composed-source consumption. Namespace every coverage ID by prototype version so evidence from different versions cannot be mixed accidentally.
 
+For a multi-board or end-to-end `WORKFLOW`, both `End-to-end coverage` and `Capability presentation contract` are mandatory. Update them before building and after review. Keep capability IDs stable across prototype versions and use the same set in both tables. Coverage rows describe whether the originating workflow is represented; the presentation contract says what should or should not become UI; journey and branch IDs still describe what one immutable version actually proves.
+
+The interaction-contract preflight is mandatory for multi-board or end-to-end `WORKFLOW` prototypes and whenever a `DELTA` or `FULL` trigger applies. For `SKIP`, record the reason and exact reused rows instead of duplicating them. Keep the rows inside the existing manifest; they have no independent lifecycle, authority, status, approval, or validator.
+
 For a multi-module request, freeze the caller's requested module list in `Composition contract` before building. Treat that list as the batch source of truth: every requested capability has one stable Module ID, one exact selected source identity, one integrated surface, and `Integrated count` exactly `1`. Do not remove, rename, split, merge, or add a module merely to match generated output; obtain an explicit scope change first. The composed version's `Composed from` Module IDs, the contract inventory, and the distinct Module IDs in `Composition coverage` must describe the same set.
 
 Run the bundled manifest validator after every material manifest edit:
@@ -213,6 +316,8 @@ For a `WORKFLOW` prototype:
 4. Record visible controls that cross the bounded target under `External boundaries`. Either make the handoff work, clearly disable it as outside the prototype, or remove it from the reviewed surface; do not leave an unexplained no-op.
 5. Exercise the natural success journey and every material confirmed branch in a running prototype. Record environment, input method, and an evidence reference. Code presence or a screenshot of one state alone is not mechanical workflow evidence.
 6. Use `PARTIALLY_CONFIRMED` while any required step is `FAIL`, `NOT_RUN`, `NOT_REVIEWED`, or only `DIRECT_STATE_ONLY`. Use `CONFIRMED` only for the exact prototype version + immutable artifact + fixture identity whose natural success journey passes, whose required branches have sufficient evidence, and whose exact IDs the product authority reviewed.
+7. Compare the candidate against the pre-build coverage ledger. Report confirmed capabilities preserved, newly validated capabilities, placeholders, missing boards, external handoffs, and regressions. A regression blocks handoff even when the candidate's bounded new interaction passes.
+8. Compare the rendered surface against the presentation contract. Fail the review if background-only or non-product metadata becomes ordinary product UI, a required visible or role-restricted capability has no usable surface, or a user-triggered background action exposes an unnecessary internal-process page.
 
 Do not silently expand the prototype to the whole product. Completeness applies only inside the recorded bounded target; adjacent capabilities remain explicit handoffs or exclusions.
 

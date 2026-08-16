@@ -409,3 +409,18 @@ node skill-router/scripts/audit-skill-integrations.mjs \
 
 - GitHub: [zhouxxx123123/create-every-baseline-v2](https://github.com/zhouxxx123123/create-every-baseline-v2)
 - Default branch: `main`
+
+## One-command Prototype design-stack update
+
+Windows / PowerShell:
+
+```powershell
+$url = 'https://raw.githubusercontent.com/zhouxxx123123/create-every-baseline-v2/main/prototype/scripts/hot-update-prototype-stack.ps1'
+$script = Join-Path $env:TEMP 'hot-update-prototype-stack.ps1'
+Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $script
+& $script -WorkspaceRoot (Get-Location).Path
+```
+
+This entry backs up and updates the `prototype`, `codex`, and `apple-design` Skills; restores the fixed `transitions.dev`, `border-beam`, and `thinking-orbs` sources; and registers the official ChatGPT UI Kit Figma source. If an authorized local `.fig` export is available, pass `-ChatGPTFigmaPath '<path>'` to verify its SHA-256 identity.
+
+Restart Codex or refresh the Skill list after a successful update.
