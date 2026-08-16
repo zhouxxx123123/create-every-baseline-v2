@@ -13,6 +13,30 @@ If the question is about logic/state rather than what something looks like — w
 
 Do not reopen multi-version exploration during refinement or verification unless the user explicitly asks for alternatives.
 
+## Run the coverage continuity gate
+
+For a multi-board or end-to-end workflow, do this before choosing or allocating the next version:
+
+1. Read the originating full-workflow scope, formal authority inventory, manifest, current canonical version, selection history, and `End-to-end coverage` ledger.
+2. State the current board and one bounded UI question.
+3. List the applicable confirmed behaviours inherited from the selected baseline; these are regression requirements, not optional references.
+4. List capabilities already present but unreviewed, placeholders, downstream boards not yet prototyped, and external handoffs.
+5. Distinguish `CURRENT_CANONICAL` from end-to-end completeness. Never describe a selected partial version as the complete product prototype.
+6. Classify each capability touched by the board as `USER_VISIBLE`, `ROLE_RESTRICTED_VISIBLE`, `USER_TRIGGERED_BACKGROUND`, `BACKGROUND_ONLY`, or `NON_PRODUCT_METADATA`.
+7. Classify its reference need as `REFERENCE_REQUIRED`, `REFERENCE_OPTIONAL`, or `REFERENCE_NOT_APPLICABLE`, and identify the reference evidence to inspect before designing.
+
+If the coverage ledger or presentation contract is missing for an existing multi-board workflow, perform a read-only authority-to-capability audit and add both before building UI. If a capability's product identity or behaviour is unresolved by formal authority, stop and return that gap instead of inventing it in the prototype.
+
+### Presentation rules
+
+- Build normal product surfaces for `USER_VISIBLE` capabilities.
+- Show `ROLE_RESTRICTED_VISIBLE` capabilities only in the correct role's surface and fixture.
+- For `USER_TRIGGERED_BACKGROUND`, render the user action and concise pending, success, failure, or recovery feedback; do not expose internal validation stages as mandatory pages unless the user must inspect or decide them.
+- Keep `BACKGROUND_ONLY` capability off the ordinary canvas. Surface it only when an exception requires user action.
+- Never render `NON_PRODUCT_METADATA` in a formal review route.
+
+For every `REFERENCE_REQUIRED` interaction, use the required ChatGPT UI Kit plus current task-analogous product references. Prefer first-party documentation, current product UI, official screenshots, or locally captured evidence. Record the pattern adopted and the semantics explicitly rejected. Do not copy another product's terminology, business model, branding, or implementation assumptions into the prototype.
+
 ## When this is the right shape
 
 - "What should this page look like?"
@@ -22,6 +46,19 @@ Do not reopen multi-version exploration during refinement or verification unless
 - "Verify that the selected prototype actually works from its natural entry."
 - "Connect the selected workflows into one product experience I can use from start to finish."
 - Any time the user would otherwise spend a day picking between three vague mockups in their head.
+
+## Required ChatGPT UI Kit component usage
+
+For every UI prototype mode (`EXPLORE_VERSIONS`, `REFINE_SELECTED`, `VERIFY_SELECTED`, or `COMPOSE_SELECTED`), use the ChatGPT UI Kit Figma component source before building, refining, or verifying the prototype:
+
+- Figma source: `https://www.figma.com/design/khXXA7rqerQEipLKEFbF2m/ChatGPT-UI-Kit--AI-Chat--Community-?t=Mq9HMb31zeQ5Y2Bz-0`
+- If the current repository provides a local export, use and hash it as an offline source as well; for the WorkforceOS prototype workspace this is `D:\workforceOS-test-v0.1\ChatGPT UI Kit, AI Chat (Community).fig`.
+
+First look for existing components or patterns in the kit that are close to the target surface, such as app shell, project/tree navigation, conversation rows, lists, cards, action rows, toolbars, popovers, forms, empty states, disabled states, and confirmation flows. When a close component or pattern exists, base the prototype UI on it instead of inventing a parallel visual language. When no close component exists, design the new UI from the kit's observable UI system: density, spacing, typography, hierarchy, radius, borders, colour use, affordance strength, icon treatment, and interaction-state language.
+
+Record in the prototype manifest or preflight notes: the Figma URL, any local export path and hash used, the components or patterns reused, the UI-system rules applied for custom pieces, and any relevant kit patterns intentionally rejected. Treat the kit as a visual/component reference only: do not make the runnable artifact depend on Figma at runtime, do not import the kit's sample business semantics into the product model, and do not let the kit override formal product authority.
+
+If neither the Figma source nor a reliable local export can be used, stop before building UI and ask the user for a usable export such as PNG, SVG, PDF, Variables, or a component inventory. Do not approximate the library from memory.
 
 ## Two sub-shapes — strongly prefer sub-shape A
 
@@ -69,6 +106,8 @@ For `EXPLORE_VERSIONS`, default to **3 versions**. More than 5 stops being radic
 
 Use the repository convention established by setup. Resolve the Prototype ID, reserve the next sequential version numbers in the manifest before building, and show the full prototype reference on review surfaces. Record `Derived from` as a full reference for refinements. For compositions, freeze the caller's requested capability list in `Composition contract`, assign one Module ID to each capability, bind each Module ID to its exact source manifest/version/artifact/fixture, and list the complete Module ID set under `Composed from`. Give every version a concise semantic display name. Do not create standalone letter labels or opaque combinations such as `A`, `AJ`, `BF`, or `L1J`; preserve inherited codes only under the manifest's `Legacy aliases`.
 
+Before reserving a version, report: mode; bounded question; current canonical full reference; originating workflow coverage status; inherited confirmed capabilities; present-but-unreviewed and placeholder areas; downstream boards still missing; external boundaries; the exact capability rows this version may change; each row's presentation class; and its reference need and evidence plan. Do not proceed when this inventory is unresolved.
+
 Write down the plan in one line, in the prototype's location or a top-of-file comment:
 
 > "Mode: EXPLORE_VERSIONS. Three versions of the settings page on the existing `/settings` route, with stable IDs on the exploration route."
@@ -80,8 +119,11 @@ This works whether the user is here to push back or not.
 In `EXPLORE_VERSIONS`, make the candidates structurally different. In `REFINE_SELECTED`, preserve the selected version's accepted direction and change only the bounded behaviour being refined. In `COMPOSE_SELECTED`, preserve every admitted source behaviour and add only the shell, navigation, shared state, handoffs, and terminal continuity needed to operate them together. Hold each new version to:
 
 - The page's purpose and the data it has access to.
-- The project's component library / styling system (TailwindCSS, shadcn, MUI, plain CSS, whatever).
+- The project's component library / styling system (TailwindCSS, shadcn, MUI, plain CSS, whatever) and the required ChatGPT UI Kit component usage above.
 - A clear exported component or artifact name derived from its full prototype reference.
+- Every applicable `CONFIRMED_PRESENT` capability in the pre-build coverage ledger remains present and mechanically reachable.
+- Every rendered capability follows its presentation class; background validation is not promoted into visible workflow steps without a user decision or inspection need.
+- Every `REFERENCE_REQUIRED` interaction records the analogous pattern used and the product semantics deliberately not inherited.
 
 Exploration versions must be **structurally different** — different layout, different information hierarchy, different primary affordance, not just different colours. Refinement versions do not need artificial visual differences; they answer the bounded change request.
 
@@ -134,9 +176,13 @@ Put the switcher in a single shared component so both sub-shapes can reuse it. L
 
 Surface the exploration URLs and one exact formal review URL per candidate. For every candidate the user sees, record the immutable artifact ref and fixed fixture ref so the same version can be reproduced later. If the user asks to combine parts of alternatives within one prototype, build that combination as one new derived version before asking them to select it. If the user asks to connect selected bounded workflows, build one `COMPOSE_SELECTED` version and surface one start command, one formal integration URL, and an acceptance summary listing requested, integrated, missing, duplicate, and excluded Module IDs. Do not hand over while missing or duplicate sets are non-empty.
 
+For a multi-board workflow, also report: formal authorities consumed; inherited confirmed capabilities preserved; capability newly validated; present-but-unreviewed areas; placeholders; missing boards; external handoffs; presentation-class decisions; reference products and patterns used; rejected semantic inheritance; and any regression. Candidate success answers the bounded question only; it does not imply end-to-end completeness.
+
 ### 6. Capture the answer and retire exploration controls
 
 Once the user chooses a version, verify its recorded artifact and fixture refs reproduce what was reviewed, mark it `CURRENT_CANONICAL`, append the choice to selection history, and preserve every other version unchanged. Make the selected version's pinned formal URL or reproduction command the default review source. For a composed version, also freeze its exact source-version, artifact, and fixture set in the manifest. Keep the switcher and unselected versions only in the repository's declared throwaway prototype location or branch, never in the downstream implementation contract.
+
+Update the end-to-end coverage ledger after selection. Mark only the capabilities proved by the selected version as `CONFIRMED_PRESENT`; keep unreviewed content, placeholders, missing boards, and external handoffs explicit. Never convert the entire workflow to complete merely because one version became `CURRENT_CANONICAL`.
 
 Do not fold prototype code directly into production. The selected version and confirmed interaction IDs become evidence for the canonical product decision and specification; production implementation is rewritten under normal architecture, test, error-handling, accessibility, and security requirements.
 
@@ -145,6 +191,10 @@ Do not fold prototype code directly into production. The selected version and co
 - **Overwriting a reviewed version.** Any observable change creates a new stable version derived from the old one.
 - **Treating a mutable URL as a frozen version.** Bind every presented version to an immutable artifact and deterministic fixture; a route that follows current source code is only a convenience pointer.
 - **Generating alternatives during refinement.** Build one derived version unless the user explicitly reopens exploration.
+- **Mistaking selection for completeness.** `CURRENT_CANONICAL` means selected, not that every source decision or workflow capability is represented.
+- **Local refinement without coverage comparison.** A polished bounded change that drops or obscures inherited confirmed capability is a regression, not a successful refinement.
+- **Turning backend rules into pages.** Important validation, permission, atomicity, or reconciliation logic does not become a user-visible step unless the user must inspect or decide it.
+- **Using a reference product as authority.** Borrow an interaction pattern, not its product semantics, terminology, data model, or implementation assumptions.
 - **Exploration versions that differ only in colour or copy.** Real alternatives disagree about structure; a small requested change is refinement, not exploration.
 - **Wiring versions to real mutations.** Use in-memory state or deterministic stubs. When the bounded question is a workflow, the visible user action and resulting transition must work even though the real backend is not involved.
 - **Pasting selected prototypes beside one another.** A composition must implement the natural entry, navigation, shared state, handoffs, and terminal continuity between them.
