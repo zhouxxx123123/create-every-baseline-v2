@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "sourceSetId": "workforceos-prototype-design-sources@2026-08-17",
+  "purpose": "Reconstruct the external design-reference stack used by the Prototype skill without redistributing restricted assets.",
+  "gitRepositories": [
+    {
+      "id": "transitions-dev",
+      "repository": "https://github.com/Jakubantalik/transitions.dev.git",
+      "commit": "a34d3676a0d9530d1eb15d5fa374718d6916eac1",
+      "targetRelativePath": "vendor/jakubantalik/transitions.dev",
+      "license": "UNRESOLVED_AT_REPOSITORY_ROOT",
+      "distributionPolicy": "REFERENCE_ONLY_UNTIL_EXACT_REUSED_FILE_OR_PACKAGE_LICENSE_IS_CONFIRMED"
+    },
+    {
+      "id": "border-beam",
+      "repository": "https://github.com/Jakubantalik/border-beam.git",
+      "commit": "51727b6082e247dcf640ea65253088f4459c707e",
+      "targetRelativePath": "vendor/jakubantalik/border-beam",
+      "license": "MIT",
+      "distributionPolicy": "SOURCE_MAY_BE_RESTORED_FROM_OFFICIAL_REPOSITORY",
+      "sourcePackage": "border-beam@1.4.0",
+      "publishedPackage": "border-beam@1.3.0",
+      "publishedPackageIntegrity": "sha512-oZSISp3aQau4ASTmzm5pzxeBinO6Fh2HW0gyEixJgtpUZvRiU0vNpP+IwGRrNpIyqPjA7Rf5EBnVqDSJ49cm5w=="
+    },
+    {
+      "id": "thinking-orbs",
+      "repository": "https://github.com/Jakubantalik/thinking-orbs.git",
+      "commit": "de85557ca220332586d070d8788c0e1d6e877a0d",
+      "targetRelativePath": "vendor/jakubantalik/thinking-orbs",
+      "license": "MIT",
+      "distributionPolicy": "SOURCE_MAY_BE_RESTORED_FROM_OFFICIAL_REPOSITORY",
+      "publishedPackage": "thinking-orbs@0.3.1",
+      "publishedPackageIntegrity": "sha512-3BG1aeB1RUTxItCml/BBuIz5JRM4kZqGuyx+vouv0fXTtcR9ZNoKjWGneHPx94y74GxgArwJZ1qbJR5dt54kSw=="
+    }
+  ],
+  "userProvidedSources": [
+    {
+      "id": "chatgpt-ui-kit-community-fig",
+      "kind": "FIGMA_EXPORT",
+      "acquisitionUrl": "https://www.figma.com/design/khXXA7rqerQEipLKEFbF2m/ChatGPT-UI-Kit--AI-Chat--Community-?t=Mq9HMb31zeQ5Y2Bz-0",
+      "fileKey": "khXXA7rqerQEipLKEFbF2m",
+      "targetRelativePath": "ChatGPT UI Kit, AI Chat (Community).fig",
+      "sha256": "7CCE1327A962A152177250CF88810AF1232042A8E9524685F6B3667DE7965BD8",
+      "distributionPolicy": "DO_NOT_REDISTRIBUTE_WITHOUT_EXPLICIT_RIGHTS; USER_SUPPLIES_AUTHORIZED_EXPORT"
+    },
+    {
+      "id": "codex-skill",
+      "kind": "CODEX_SKILL",
+      "defaultPathTemplate": "%USERPROFILE%/.codex/skills/codex/SKILL.md",
+      "sha256": "CFBAF5BC5CE1690DC58F5FB0DF4A0981889EE22E68FEE7D49E2CB81793A9B501",
+      "distributionPolicy": "DO_NOT_REDISTRIBUTE_WITHOUT_CONFIRMED_RIGHTS; USER_SUPPLIES_AUTHORIZED_SKILL"
+    },
+    {
+      "id": "apple-design-skill",
+      "kind": "CODEX_SKILL",
+      "defaultPathTemplate": "%USERPROFILE%/.codex/skills/apple-design/SKILL.md",
+      "sha256": "11840B24A11D7F94F39C6AAAB074750AE4E4DE4EF54EE4B1DD97E16EBD485E61",
+      "distributionPolicy": "DO_NOT_REDISTRIBUTE_WITHOUT_CONFIRMED_RIGHTS; USER_SUPPLIES_AUTHORIZED_SKILL"
+    }
+  ]
+}
