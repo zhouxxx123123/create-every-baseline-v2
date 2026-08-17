@@ -28,7 +28,7 @@ Read [track-foundation.md](track-foundation.md) only while this track is active.
 | --- | --- | --- |
 | Clarify a product, resolve decisions, or map a large effort | `product-discovery` | A bounded decision, domain model, map, and hardening review |
 | Decide whether uncertainty needs sources, observation, or experiment | `evidence-validation` | Correct evidence routing and a readiness assessment |
-| Convert confirmed context into buildable work | `delivery` | A traceable spec boundary, ticket plan, implementation contract, and review |
+| Convert confirmed context into buildable work | `delivery` | A traceable spec boundary, operational data contract when applicable, ticket plan, implementation contract, and review |
 | Diagnose bugs or improve repository health | `engineering-maintenance` | A red loop, triage brief, architecture finding, and safe recovery plan |
 | Create or maintain reusable skills | `skill-authoring` | A validated skill design and routing audit |
 

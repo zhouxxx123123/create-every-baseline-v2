@@ -18,4 +18,6 @@ Not admitted:
 - cross-device synchronization;
 - production deployment.
 
-The exercise is to define a specification boundary and implementation route, not to silently broaden the feature.
+The Task name is authoritative persisted business state. The exercise therefore includes a database-neutral operational data contract before specification. Do not choose a physical database merely from the fixture implementation; record the physical gate separately.
+
+The exercise is to define a data contract, specification boundary, and implementation route without silently broadening the feature.

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Data Design"
+  short_description: "Create validated operational data contracts"
+  default_prompt: "Use $data-design to turn confirmed product decisions into a validated operational data design."
+
+policy:
+  allow_implicit_invocation: false

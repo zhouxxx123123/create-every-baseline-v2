@@ -1018,7 +1018,8 @@ function resolveEvidence(workspace, evidenceArgument) {
 }
 
 function hashFile(path) {
-  return createHash("sha256").update(readFileSync(path)).digest("hex");
+  const normalized = readFileSync(path, "utf8").replace(/\r\n/g, "\n");
+  return createHash("sha256").update(normalized, "utf8").digest("hex");
 }
 
 function hashText(value) {
