@@ -136,7 +136,7 @@ $learn-baseline
 
 ## Skill 目录
 
-当前仓库包含 35 个有效 Skill。
+当前仓库包含 36 个有效 Skill。
 
 ### 初始化与导航
 
@@ -193,6 +193,7 @@ $learn-baseline
 | `learn-baseline` | 通过提交、教师验收、Track 评分和分路线 Capstone，在安全练习仓库中学习 Skill 工作流 |
 | `write-a-skill` | 创建具有标准目录、渐进披露和配套资源的新 Skill |
 | `writing-great-skills` | 编写可预测 Skill 的原则、术语和审查参考 |
+| `goal-builder` | 将复杂目标建立为带证据闸门、断点恢复、阶段文件和严格校验的 Goal 任务包，并审查或修复现有任务包 |
 | `agent-reach` | 调用外部工具搜索和读取多个互联网平台 |
 | `teach` | 在当前目录建立可跨会话持续的学习工作区 |
 | `caveman` | 使用极度精简但保留技术信息的表达方式 |

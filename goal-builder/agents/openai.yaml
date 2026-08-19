@@ -1,0 +1,4 @@
+interface:
+  display_name: "Goal Builder"
+  short_description: "Build and audit rigorous resumable Goal task packages"
+  default_prompt: "Use $goal-builder to turn this complex objective into an evidence-gated, resumable Goal task package."
